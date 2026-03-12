@@ -118,8 +118,8 @@ export default function Dashboard() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // ── Export Modal ──
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ─── Sélection congrès ───────────────────────────────────────────────────────
   const selectedCongres = congres.find(c => c.id === selectedId) ?? null;
@@ -623,11 +623,21 @@ export default function Dashboard() {
     valide: activeParticipants.filter(p => p.statut === 'VALIDE').length,
   };
 
+
   return (
     <div className="min-h-screen flex bg-[#F8F9FB] text-[#1D1D1D] font-sans selection:bg-blue-100">
 
+
       {/* ══════════════ SIDEBAR GAUCHE (STYLE FLOWDESK) ══════════════ */}
-      <aside className="w-[260px] shrink-0 bg-white border-r border-[#E8EAEF] flex flex-col h-screen sticky top-0">
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[260px] shrink-0 bg-white border-r border-[#E8EAEF] flex flex-col h-screen transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}>
         {/* Logo */}
         <div className="px-6 py-8 flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -732,25 +742,35 @@ export default function Dashboard() {
       </aside>
 
       {/* ══════════════ CONTENU PRINCIPAL ══════════════ */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
 
         {/* TOP BAR SEARCH */}
-        <header className="h-[80px] shrink-0 bg-white border-b border-[#E8EAEF] px-8 flex items-center justify-between">
-          <div className="relative w-[400px]">
+        <header className="h-[70px] md:h-[80px] shrink-0 bg-white border-b border-[#E8EAEF] px-4 md:px-8 flex items-center justify-between gap-3">
+          {/* Hamburger mobile */}
+          <button
+            className="lg:hidden p-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-500 hover:bg-gray-100 transition-all shrink-0"
+            onClick={() => setSidebarOpen(o => !o)}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div className="relative flex-1 max-w-[400px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Rechercher un médecin, une ville..."
+              placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#F5F7FA] border-none rounded-2xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none placeholder:text-gray-400"
             />
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <button
               onClick={() => setHistoryOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-gray-50 text-gray-500 hover:text-blue-600 transition-all border border-gray-100 flex items-center gap-2 text-xs font-bold"
+              className="hidden sm:flex px-4 py-2.5 rounded-xl bg-gray-50 text-gray-500 hover:text-blue-600 transition-all border border-gray-100 items-center gap-2 text-xs font-bold"
             >
               <Clock className="w-4 h-4" /> Historique ({exportHistory.length})
             </button>
@@ -760,16 +780,18 @@ export default function Dashboard() {
             {selectedCongres && (
               <button
                 onClick={handleExportAgence}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2"
               >
-                Envoyer à l'agence ({participants.filter(p => !p.dejaExporte && p.statut === 'VALIDE').length})
+                <span className="hidden md:inline">Envoyer à l'agence</span>
+                <span className="md:hidden">Agence</span>
+                ({participants.filter(p => !p.dejaExporte && p.statut === 'VALIDE').length})
               </button>
             )}
           </div>
         </header>
 
         {/* SCROLLABLE MAIN */}
-        <main className="flex-1 overflow-y-auto p-8 space-y-8 pb-12">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 pb-12">
 
           {viewMode === 'ARCHIVES' ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -950,8 +972,8 @@ export default function Dashboard() {
               </div>
 
               {/* Stats Grid avec cercle de progression */}
-              <div className="grid grid-cols-4 gap-6">
-                <div className="col-span-1 bg-white p-8 rounded-[40px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                <div className="col-span-2 md:col-span-1 bg-white p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group">
                   <div className="relative w-32 h-32 mb-4">
                     <svg className="w-full h-full -rotate-90">
                       <circle cx="64" cy="64" r="58" stroke="#F1F5F9" strokeWidth="8" fill="transparent" />
@@ -965,9 +987,9 @@ export default function Dashboard() {
                   <p className="text-sm font-bold text-gray-900">Progression Totale</p>
                 </div>
 
-                <div className="col-span-3 grid grid-cols-3 gap-6">
+                <div className="col-span-2 md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                   {[
-                    { label: 'Total Médecins', val: stats.total, color: 'blue', icon: Users, sub: 'Importés' },
+                    { label: 'Total', val: stats.total, color: 'blue', icon: Users, sub: 'Importés' },
                     { label: 'À traiter', val: stats.aTraiter, color: 'amber', icon: AlertCircle, sub: 'Prioritaire' },
                     { label: 'En attente', val: stats.attente, color: 'indigo', icon: Clock, sub: 'PDF envoyés' },
                   ].map((s) => (
