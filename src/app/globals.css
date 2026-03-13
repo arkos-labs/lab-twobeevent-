@@ -20,6 +20,7 @@ html.dark {
   --sidebar-border: #1F2937;
   --input: #1F2937;
   --muted: #9CA3AF;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -44,12 +45,13 @@ body {
   transition-timing-function: ease-in-out;
 }
 
-/* ─── DARK MODE: ÉLÉMENTS DE BASE ─────────────────────────────────────── */
-/* Force les titres h1-h6, p, td, th, label à être lisibles en dark */
-html.dark {
-  color-scheme: dark;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE — Règles globales exhaustives
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── 1. TEXTES ────────────────────────────────────────────────────────────── */
+
+/* Titres */
 html.dark h1,
 html.dark h2,
 html.dark h3,
@@ -59,25 +61,9 @@ html.dark h6 {
   color: #F3F4F6 !important;
 }
 
-html.dark p:not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-white"]) {
-  color: #D1D5DB;
-}
-
-html.dark td,
-html.dark th {
-  color: #D1D5DB;
-}
-
-html.dark label {
-  color: #D1D5DB;
-}
-
-/* ─── DARK MODE GLOBAL — couvre tous les textes et fonds qui restent en clair ─ */
-
-/* Tous les textes gris foncé deviennent clairs */
+/* Textes gris foncés → clairs */
 html.dark .text-gray-900,
-html.dark .text-gray-800,
-html.dark .text-\[\#1D1D1D\] {
+html.dark .text-gray-800 {
   color: #F3F4F6 !important;
 }
 
@@ -93,38 +79,101 @@ html.dark .text-gray-500 {
   color: #6B7280 !important;
 }
 
-/* Fonds blancs et gris clairs deviennent sombres */
+/* Texte hardcodé #1D1D1D */
+html.dark [class*="text-[#1D1D1D]"] {
+  color: #F3F4F6 !important;
+}
+
+/* Tous les spans, p, td, th par défaut */
+html.dark span:not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-white"]):not([class*="text-yellow"]):not([class*="text-indigo"]):not([class*="text-orange"]):not([class*="text-purple"]):not([class*="text-gray-3"]):not([class*="text-gray-4"]) {
+  color: #D1D5DB;
+}
+
+html.dark p:not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-white"]):not([class*="text-yellow"]):not([class*="text-orange"]) {
+  color: #D1D5DB;
+}
+
+html.dark td,
+html.dark th,
+html.dark label {
+  color: #D1D5DB;
+}
+
+/* ── 2. FONDS BLANCS ET GRIS CLAIRS ─────────────────────────────────────── */
+
 html.dark .bg-white {
   background-color: #161B27 !important;
 }
 
 html.dark .bg-gray-50,
-html.dark .bg-\[\#F8F9FB\],
-html.dark .bg-\[\#F5F7FA\] {
-  background-color: #1F2937 !important;
+html.dark .bg-gray-50\/50,
+html.dark .bg-gray-50\/30 {
+  background-color: #1a2234 !important;
 }
 
 html.dark .bg-gray-100 {
   background-color: #374151 !important;
 }
 
-/* Bordures grises deviennent plus sombres */
+html.dark .bg-gray-200 {
+  background-color: #374151 !important;
+  color: #D1D5DB !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1F2937 !important;
+}
+
+html.dark [class*="bg-[#F8F9FB]"],
+html.dark [class*="bg-[#F5F7FA]"] {
+  background-color: #1F2937 !important;
+}
+
+/* ── 3. BOUTONS GRIS / BORDURES ─────────────────────────────────────────── */
+
+/* Bouton "Filtrer", "Historique", etc. avec bg-white/gray-50 */
+html.dark button.bg-white,
+html.dark button[class*="bg-gray-50"],
+html.dark button[class*="bg-gray-100"] {
+  background-color: #1F2937 !important;
+  border-color: #374151 !important;
+  color: #D1D5DB !important;
+}
+
+html.dark button[class*="bg-[#F5F7FA]"],
+html.dark button[class*="bg-[#F8F9FB]"] {
+  background-color: #1F2937 !important;
+  color: #D1D5DB !important;
+}
+
+/* Hover sur les boutons gris */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-gray-200:hover {
+  background-color: #2D3748 !important;
+}
+
+/* ── 4. BORDURES ─────────────────────────────────────────────────────────── */
+
 html.dark .border-gray-50,
 html.dark .border-gray-100,
 html.dark .border-gray-200,
-html.dark .border-\[\#E8EAEF\],
-html.dark .border-\[\#F0F2F5\],
-html.dark .border-white {
+html.dark .border-white,
+html.dark [class*="border-[#E8EAEF]"],
+html.dark [class*="border-[#F0F2F5]"] {
   border-color: #1F2937 !important;
 }
 
-/* Inputs et select */
+/* ── 5. INPUTS / SELECTS ─────────────────────────────────────────────────── */
+
 html.dark input[type="text"],
 html.dark input[type="email"],
 html.dark input[type="tel"],
 html.dark input[type="date"],
 html.dark input[type="time"],
+html.dark input[type="number"],
 html.dark input[type="password"],
+html.dark input[type="checkbox"],
 html.dark textarea,
 html.dark select {
   background-color: #1F2937 !important;
@@ -137,44 +186,72 @@ html.dark textarea::placeholder {
   color: #6B7280 !important;
 }
 
-/* Modales / panneaux */
-html.dark .rounded-\[40px\].bg-white,
-html.dark .rounded-\[32px\].bg-white,
-html.dark .rounded-\[36px\].bg-white {
-  background-color: #161B27 !important;
+/* ── 6. BADGES "+ SAISIR OPTIONS" et autres boutons action dans le tableau ── */
+
+/* Boutons bleu outline (+ SAISIR OPTIONS) */
+html.dark [class*="bg-blue-50"] {
+  background-color: rgba(37, 99, 235, 0.15) !important;
 }
 
-/* Fond hover en gris sur les listes */
-html.dark .hover\:bg-gray-50:hover,
-html.dark .hover\:bg-gray-100:hover {
+html.dark [class*="border-blue-100"] {
+  border-color: rgba(37, 99, 235, 0.3) !important;
+}
+
+/* Badges statut amber/orange */
+html.dark [class*="bg-amber-50"] {
+  background-color: rgba(217, 119, 6, 0.15) !important;
+}
+
+html.dark [class*="border-amber-100"],
+html.dark [class*="border-amber-200"] {
+  border-color: rgba(217, 119, 6, 0.3) !important;
+}
+
+/* Badges emerald/vert */
+html.dark [class*="bg-emerald-50"] {
+  background-color: rgba(5, 150, 105, 0.15) !important;
+}
+
+/* Badges indigo */
+html.dark [class*="bg-indigo-50"] {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+}
+
+/* ── 7. AVATARS / ICÔNES ─────────────────────────────────────────────────── */
+
+/* Avatar lettre dans le tableau (fond blanc → sombre) */
+html.dark .border-white {
+  border-color: #374151 !important;
+}
+
+/* ── 8. SIDEBAR — textes du menu ────────────────────────────────────────── */
+
+html.dark nav button:not([class*="bg-blue"]) {
+  color: #9CA3AF;
+}
+
+html.dark nav button:not([class*="bg-blue"]):hover {
   background-color: #1F2937 !important;
+  color: #E5E7EB !important;
 }
 
-/* Badges gris */
-html.dark .bg-gray-200 {
-  background-color: #374151 !important;
-  color: #D1D5DB !important;
+/* Texte "MENU", "CONGRÈS ACTIFS" */
+html.dark p[class*="text-gray-4"] {
+  color: #4B5563 !important;
 }
 
-/* Tag "DE", "TEL" dans le tableau */
-html.dark .bg-gray-100.text-gray-500 {
-  background-color: #374151 !important;
-  color: #9CA3AF !important;
-}
+/* ── 9. DIVIDERS ──────────────────────────────────────────────────────────── */
 
-/* Éléments bg-[#F8F9FB] style carte stats bas */
-html.dark [class*="bg-\[#F8F9FB\]"] {
-  background-color: #1F2937 !important;
-}
-
-/* Dividers */
-html.dark .divide-gray-50>*+* {
+html.dark .divide-gray-50>*+*,
+html.dark [class*="divide-gray"]>*+* {
   border-color: #1F2937 !important;
 }
 
-/* Scroll bars en sombre */
+/* ── 10. SCROLL BARS ─────────────────────────────────────────────────────── */
+
 html.dark ::-webkit-scrollbar {
   background: #0F1117;
+  width: 6px;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
