@@ -44,6 +44,34 @@ body {
   transition-timing-function: ease-in-out;
 }
 
+/* ─── DARK MODE: ÉLÉMENTS DE BASE ─────────────────────────────────────── */
+/* Force les titres h1-h6, p, td, th, label à être lisibles en dark */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6 {
+  color: #F3F4F6 !important;
+}
+
+html.dark p:not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-white"]) {
+  color: #D1D5DB;
+}
+
+html.dark td,
+html.dark th {
+  color: #D1D5DB;
+}
+
+html.dark label {
+  color: #D1D5DB;
+}
+
 /* ─── DARK MODE GLOBAL — couvre tous les textes et fonds qui restent en clair ─ */
 
 /* Tous les textes gris foncé deviennent clairs */

@@ -575,13 +575,13 @@ export default function Dashboard() {
       if (errSettings) console.error("Erreur Settings Supabase:", errSettings);
 
       // Upsert de l'historique
-      if (exportHistory.length > 0) {
-        const historyPayload = exportHistory.map((h, i) => ({
-          id: `${h.date}-${i}`,
-          date: h.date,
-          description: h.congresName,
-          nb_participants: h.count
-        }));
+      const historyPayload = exportHistory.map((h, i) => ({
+        id: `${h.date}-${i}`,
+        date: h.date,
+        description: h.congresName,
+        nb_participants: h.count
+      }));
+      if (historyPayload.length > 0) {
         const { error: errHist } = await supabase.from('export_history').upsert(historyPayload, { onConflict: 'id' });
         if (errHist) console.error("Erreur Historique Supabase:", errHist);
       }
@@ -618,6 +618,41 @@ export default function Dashboard() {
       if (allParticipants.length > 0) {
         const { error: errPart } = await supabase.from('participants').upsert(allParticipants, { onConflict: 'id' });
         if (errPart) console.error("Erreur Participants Supabase:", errPart);
+      }
+
+      // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
+
+      // Supprimer les participants qui ont été définitivement supprimés
+      const currentParticipantIds = allParticipants.map(p => p.id);
+      if (currentParticipantIds.length > 0) {
+        const { error: errDelPart } = await supabase
+          .from('participants')
+          .delete()
+          .not('id', 'in', `(${currentParticipantIds.map(id => `'${id}'`).join(',')})`)
+        if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
+      }
+
+      // Supprimer les congrès qui ont été supprimés
+      const currentCongresIds = congresPayload.map(c => c.id);
+      if (currentCongresIds.length > 0) {
+        const { error: errDelCongres } = await supabase
+          .from('congres')
+          .delete()
+          .not('id', 'in', `(${currentCongresIds.map(id => `'${id}'`).join(',')})`)
+        if (errDelCongres) console.error("Erreur DELETE congrès:", errDelCongres);
+      }
+
+      // Pour l'historique : supprimer les entrées qui ne sont plus dans l'état
+      const currentHistoryIds = historyPayload.map((h) => h.id);
+      if (currentHistoryIds.length > 0) {
+        const { error: errDelHist } = await supabase
+          .from('export_history')
+          .delete()
+          .not('id', 'in', `(${currentHistoryIds.map((id: string) => `'${id}'`).join(',')})`)
+        if (errDelHist) console.error("Erreur DELETE historique:", errDelHist);
+      } else {
+        // Si plus d'historique du tout, vider la table
+        await supabase.from('export_history').delete().neq('id', '');
       }
     };
 
