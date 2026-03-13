@@ -5,7 +5,8 @@ import {
   FileUp, Users, CheckCircle2, Loader2, FileDown,
   MailCheck, Mail, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
-  Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket
+  Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
+  Moon, Sun
 } from 'lucide-react';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import * as XLSX from 'xlsx';
@@ -120,6 +121,26 @@ export default function Dashboard() {
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── Dark Mode ──
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
+
+  const toggleDark = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('logitools_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('logitools_theme', 'light');
+    }
+  };
 
   // ─── Sélection congrès ───────────────────────────────────────────────────────
   const selectedCongres = congres.find(c => c.id === selectedId) ?? null;
@@ -636,14 +657,14 @@ export default function Dashboard() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[260px] shrink-0 bg-white border-r border-[#E8EAEF] flex flex-col h-screen transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}>
+      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[260px] shrink-0 flex flex-col h-screen transition-transform duration-300 border-r ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-[#E8EAEF]'}`}>
         {/* Logo */}
-        <div className="px-6 py-8 flex items-center gap-3">
+        <div className={`px-6 py-8 flex items-center gap-3 border-b ${isDark ? 'border-[#1F2937]' : 'border-gray-50'}`}>
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <LayoutDashboard className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight">LogiCongrès</span>
+          <span className={`text-xl font-bold tracking-tight ${isDark ? 'text-gray-100' : 'text-[#1D1D1D]'}`}>LogiCongrès</span>
         </div>
 
         {/* Navigation */}
@@ -721,19 +742,32 @@ export default function Dashboard() {
         </nav>
 
         {/* User / Setting Bottom */}
-        <div className="p-4 border-t border-[#F0F2F5] space-y-4">
+        <div className={`p-4 border-t space-y-4 ${isDark ? 'border-[#1F2937]' : 'border-[#F0F2F5]'}`}>
           {selectedId && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 bg-[#F5F7FA] hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm font-bold transition-all"
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${isDark ? 'bg-[#1F2937] hover:bg-[#374151] text-gray-300' : 'bg-[#F5F7FA] hover:bg-gray-200 text-gray-700'}`}
             >
               <FileUp className="w-4 h-4" /> Importer un Excel
             </button>
           )}
+
+          {/* Toggle Dark Mode */}
+          <button
+            onClick={toggleDark}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all text-sm ${isDark
+              ? 'bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? 'Mode Clair' : 'Mode Sombre'}
+          </button>
+
           <div className="flex items-center gap-3 px-2">
             <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center font-bold text-blue-600">JD</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate">Administrateur</p>
+              <p className={`text-sm font-bold truncate ${isDark ? 'text-gray-200' : ''}`}>Administrateur</p>
               <p className="text-[10px] text-gray-400 uppercase">Super Utilisateur</p>
             </div>
             <Settings className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
@@ -742,10 +776,11 @@ export default function Dashboard() {
       </aside>
 
       {/* ══════════════ CONTENU PRINCIPAL ══════════════ */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+      <div className={`flex-1 flex flex-col h-screen overflow-hidden min-w-0 ${isDark ? 'bg-[#0F1117]' : 'bg-[#F8F9FB]'}`}>
 
         {/* TOP BAR SEARCH */}
-        <header className="h-[70px] md:h-[80px] shrink-0 bg-white border-b border-[#E8EAEF] px-4 md:px-8 flex items-center justify-between gap-3">
+        <header className={`h-[70px] md:h-[80px] shrink-0 border-b px-4 md:px-8 flex items-center justify-between gap-3 ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-[#E8EAEF]'
+          }`}>
           {/* Hamburger mobile */}
           <button
             className="lg:hidden p-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-500 hover:bg-gray-100 transition-all shrink-0"
@@ -763,7 +798,8 @@ export default function Dashboard() {
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#F5F7FA] border-none rounded-2xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none placeholder:text-gray-400"
+              className={`w-full border-none rounded-2xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none placeholder:text-gray-400 ${isDark ? 'bg-[#1F2937] text-gray-200' : 'bg-[#F5F7FA] text-gray-700'
+                }`}
             />
           </div>
 
@@ -961,7 +997,7 @@ export default function Dashboard() {
               {/* Header Info */}
               <div className="flex justify-between items-end">
                 <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight text-gray-900">{selectedCongres.nom}</h2>
+                  <h2 className={`text-3xl font-extrabold tracking-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{selectedCongres.nom}</h2>
                   <p className="text-gray-400 mt-1 font-medium">{selectedCongres.date || "Événement planifié"}</p>
                 </div>
                 <div className="flex gap-2">
@@ -973,7 +1009,7 @@ export default function Dashboard() {
 
               {/* Stats Grid avec cercle de progression */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <div className="col-span-2 md:col-span-1 bg-white p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group">
+                <div className={`col-span-2 md:col-span-1 p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group ${isDark ? 'bg-[#161B27]' : 'bg-white'}`}>
                   <div className="relative w-32 h-32 mb-4">
                     <svg className="w-full h-full -rotate-90">
                       <circle cx="64" cy="64" r="58" stroke="#F1F5F9" strokeWidth="8" fill="transparent" />
@@ -984,7 +1020,7 @@ export default function Dashboard() {
                       <span className="text-[10px] font-bold text-gray-400 uppercase">Validés</span>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">Progression Totale</p>
+                  <p className={`text-sm font-bold ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>Progression Totale</p>
                 </div>
 
                 <div className="col-span-2 md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
@@ -993,7 +1029,7 @@ export default function Dashboard() {
                     { label: 'À traiter', val: stats.aTraiter, color: 'amber', icon: AlertCircle, sub: 'Prioritaire' },
                     { label: 'En attente', val: stats.attente, color: 'indigo', icon: Clock, sub: 'PDF envoyés' },
                   ].map((s) => (
-                    <div key={s.label} className="bg-white p-8 rounded-[40px] shadow-sm border border-white flex flex-col justify-between hover:translate-y-[-4px] transition-all">
+                    <div key={s.label} className={`p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col justify-between hover:translate-y-[-4px] transition-all border ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-white'}`}>
                       <div className="flex justify-between items-start">
                         <div className={`p-4 rounded-3xl bg-${s.color}-50 text-${s.color}-600`}>
                           <s.icon className="w-6 h-6" />
@@ -1001,7 +1037,7 @@ export default function Dashboard() {
                         <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{s.sub}</span>
                       </div>
                       <div className="mt-6">
-                        <p className="text-4xl font-black text-gray-900">{s.val}</p>
+                        <p className={`text-4xl font-black ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{s.val}</p>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">{s.label}</p>
                       </div>
                     </div>
@@ -1010,10 +1046,10 @@ export default function Dashboard() {
               </div>
 
               {/* Main Table Section */}
-              <div className="bg-white rounded-[32px] shadow-sm border border-white overflow-hidden">
-                <div className="px-8 py-6 border-b border-gray-50 flex justify-between items-center bg-white">
+              <div className={`rounded-[32px] shadow-sm overflow-hidden border ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-white'}`}>
+                <div className={`px-8 py-6 border-b flex justify-between items-center ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-gray-50'}`}>
                   <div className="flex items-center gap-4">
-                    <h3 className="font-bold text-lg">Suivi du Travail</h3>
+                    <h3 className={`font-bold text-lg ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Suivi du Travail</h3>
                     {selectedParticipants.size > 0 && (
                       <div className="flex items-center gap-2 animate-in slide-in-from-left-4">
                         <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-lg">{selectedParticipants.size} sélectionnés</span>
@@ -1037,7 +1073,7 @@ export default function Dashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50">
+                      <tr className={`text-[11px] font-bold text-gray-400 uppercase tracking-widest ${isDark ? 'bg-gray-900/50' : 'bg-gray-50/50'}`}>
                         <th className="px-8 py-4 w-10">
                           <input
                             type="checkbox"
@@ -1053,11 +1089,11 @@ export default function Dashboard() {
                         <th className="px-8 py-4 text-right pr-12">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className={`divide-y ${isDark ? 'divide-gray-700/50' : 'divide-gray-50'}`}>
                       {filteredParticipants.map(p => {
                         const loading = loadingIds.has(p.id);
                         return (
-                          <tr key={p.id} className={`group hover:bg-gray-50/50 transition-all ${selectedParticipants.has(p.id) ? 'bg-blue-50/30' : ''}`}>
+                          <tr key={p.id} className={`group transition-all ${selectedParticipants.has(p.id) ? 'bg-blue-50/30' : isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'}`}>
                             {/* Checkbox */}
                             <td className="px-8 py-6">
                               <input
@@ -1075,7 +1111,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
-                                    <p className="font-bold text-gray-900">{p.nom}</p>
+                                    <p className={`font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{p.nom}</p>
                                     <button onClick={() => openContactModal(p)} className="p-1 hover:bg-gray-100 rounded-md transition-all">
                                       <Mail className={`w-3 h-3 ${validateEmail(p.email) ? 'text-emerald-500' : 'text-red-400'}`} />
                                     </button>
@@ -1089,7 +1125,7 @@ export default function Dashboard() {
                             <td className="px-8 py-6">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2 text-gray-600">
-                                  <span className="text-[10px] font-black bg-gray-100 px-2 py-0.5 rounded text-gray-500">DE</span>
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>DE</span>
                                   <span className="text-sm font-bold truncate max-w-[150px]">{p.villeDepart}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-gray-400">

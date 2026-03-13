@@ -1,8 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F8F9FB;
+  --foreground: #1D1D1D;
+
+  /* Sidebar */
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #E8EAEF;
+  --sidebar-text: #6B7280;
+  --sidebar-hover: #F3F4F6;
+
+  /* Main */
+  --main-bg: #F8F9FB;
+  --card-bg: #ffffff;
+  --card-border: #E8EAEF;
+
+  /* Table */
+  --table-bg: #ffffff;
+  --table-row-hover: rgba(249,250,251,0.5);
+  --table-header-bg: rgba(249,250,251,0.5);
+  --table-divider: #F9FAFB;
+
+  /* Text */
+  --text-primary: #1D1D1D;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+
+  /* Input */
+  --input-bg: #F5F7FA;
+  --input-border: transparent;
+}
+
+/* ─── DARK MODE ──────────────────────────────────────────────────────────── */
+html.dark {
+  --background: #0F1117;
+  --foreground: #E5E7EB;
+
+  /* Sidebar */
+  --sidebar-bg: #161B27;
+  --sidebar-border: #1F2937;
+  --sidebar-text: #9CA3AF;
+  --sidebar-hover: #1F2937;
+
+  /* Main */
+  --main-bg: #0F1117;
+  --card-bg: #161B27;
+  --card-border: #1F2937;
+
+  /* Table */
+  --table-bg: #161B27;
+  --table-row-hover: rgba(31,41,55,0.5);
+  --table-header-bg: rgba(17,24,39,0.5);
+  --table-divider: #1F2937;
+
+  /* Text */
+  --text-primary: #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+
+  /* Input */
+  --input-bg: #1F2937;
+  --input-border: #374151;
 }
 
 @theme inline {
@@ -12,15 +70,24 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ─── Dark mode overrides utilitaires ───────────────────────────────────── */
+html.dark .dk-bg-card       { background-color: var(--card-bg) !important; }
+html.dark .dk-bg-main       { background-color: var(--main-bg) !important; }
+html.dark .dk-bg-sidebar    { background-color: var(--sidebar-bg) !important; }
+html.dark .dk-border        { border-color: var(--card-border) !important; }
+html.dark .dk-text          { color: var(--text-primary) !important; }
+html.dark .dk-text-muted    { color: var(--text-secondary) !important; }
+html.dark .dk-input         { background-color: var(--input-bg) !important; color: var(--text-primary) !important; }
+
+/* Transition douce pour tout le site */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
 }
