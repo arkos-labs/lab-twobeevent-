@@ -3,64 +3,23 @@
 :root {
   --background: #F8F9FB;
   --foreground: #1D1D1D;
-
-  /* Sidebar */
-  --sidebar-bg: #ffffff;
-  --sidebar-border: #E8EAEF;
-  --sidebar-text: #6B7280;
-  --sidebar-hover: #F3F4F6;
-
-  /* Main */
-  --main-bg: #F8F9FB;
-  --card-bg: #ffffff;
+  --card: #ffffff;
   --card-border: #E8EAEF;
-
-  /* Table */
-  --table-bg: #ffffff;
-  --table-row-hover: rgba(249,250,251,0.5);
-  --table-header-bg: rgba(249,250,251,0.5);
-  --table-divider: #F9FAFB;
-
-  /* Text */
-  --text-primary: #1D1D1D;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
-
-  /* Input */
-  --input-bg: #F5F7FA;
-  --input-border: transparent;
+  --sidebar: #ffffff;
+  --sidebar-border: #E8EAEF;
+  --input: #F5F7FA;
+  --muted: #6B7280;
 }
 
-/* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 html.dark {
   --background: #0F1117;
   --foreground: #E5E7EB;
-
-  /* Sidebar */
-  --sidebar-bg: #161B27;
-  --sidebar-border: #1F2937;
-  --sidebar-text: #9CA3AF;
-  --sidebar-hover: #1F2937;
-
-  /* Main */
-  --main-bg: #0F1117;
-  --card-bg: #161B27;
+  --card: #161B27;
   --card-border: #1F2937;
-
-  /* Table */
-  --table-bg: #161B27;
-  --table-row-hover: rgba(31,41,55,0.5);
-  --table-header-bg: rgba(17,24,39,0.5);
-  --table-divider: #1F2937;
-
-  /* Text */
-  --text-primary: #F3F4F6;
-  --text-secondary: #9CA3AF;
-  --text-muted: #6B7280;
-
-  /* Input */
-  --input-bg: #1F2937;
-  --input-border: #374151;
+  --sidebar: #161B27;
+  --sidebar-border: #1F2937;
+  --input: #1F2937;
+  --muted: #9CA3AF;
 }
 
 @theme inline {
@@ -76,18 +35,125 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ─── Dark mode overrides utilitaires ───────────────────────────────────── */
-html.dark .dk-bg-card       { background-color: var(--card-bg) !important; }
-html.dark .dk-bg-main       { background-color: var(--main-bg) !important; }
-html.dark .dk-bg-sidebar    { background-color: var(--sidebar-bg) !important; }
-html.dark .dk-border        { border-color: var(--card-border) !important; }
-html.dark .dk-text          { color: var(--text-primary) !important; }
-html.dark .dk-text-muted    { color: var(--text-secondary) !important; }
-html.dark .dk-input         { background-color: var(--input-bg) !important; color: var(--text-primary) !important; }
-
-/* Transition douce pour tout le site */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color;
+/* ─── TRANSITION DOUCE GLOBALE ─────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, box-shadow;
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;
+}
+
+/* ─── DARK MODE GLOBAL — couvre tous les textes et fonds qui restent en clair ─ */
+
+/* Tous les textes gris foncé deviennent clairs */
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-\[\#1D1D1D\] {
+  color: #F3F4F6 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #D1D5DB !important;
+}
+
+html.dark .text-gray-600 {
+  color: #9CA3AF !important;
+}
+
+html.dark .text-gray-500 {
+  color: #6B7280 !important;
+}
+
+/* Fonds blancs et gris clairs deviennent sombres */
+html.dark .bg-white {
+  background-color: #161B27 !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-\[\#F8F9FB\],
+html.dark .bg-\[\#F5F7FA\] {
+  background-color: #1F2937 !important;
+}
+
+html.dark .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+/* Bordures grises deviennent plus sombres */
+html.dark .border-gray-50,
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-\[\#E8EAEF\],
+html.dark .border-\[\#F0F2F5\],
+html.dark .border-white {
+  border-color: #1F2937 !important;
+}
+
+/* Inputs et select */
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="tel"],
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="password"],
+html.dark textarea,
+html.dark select {
+  background-color: #1F2937 !important;
+  color: #F3F4F6 !important;
+  border-color: #374151 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #6B7280 !important;
+}
+
+/* Modales / panneaux */
+html.dark .rounded-\[40px\].bg-white,
+html.dark .rounded-\[32px\].bg-white,
+html.dark .rounded-\[36px\].bg-white {
+  background-color: #161B27 !important;
+}
+
+/* Fond hover en gris sur les listes */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #1F2937 !important;
+}
+
+/* Badges gris */
+html.dark .bg-gray-200 {
+  background-color: #374151 !important;
+  color: #D1D5DB !important;
+}
+
+/* Tag "DE", "TEL" dans le tableau */
+html.dark .bg-gray-100.text-gray-500 {
+  background-color: #374151 !important;
+  color: #9CA3AF !important;
+}
+
+/* Éléments bg-[#F8F9FB] style carte stats bas */
+html.dark [class*="bg-\[#F8F9FB\]"] {
+  background-color: #1F2937 !important;
+}
+
+/* Dividers */
+html.dark .divide-gray-50>*+* {
+  border-color: #1F2937 !important;
+}
+
+/* Scroll bars en sombre */
+html.dark ::-webkit-scrollbar {
+  background: #0F1117;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 8px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4B5563;
 }
