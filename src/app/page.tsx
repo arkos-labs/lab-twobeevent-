@@ -621,38 +621,42 @@ export default function Dashboard() {
       }
 
       // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
+      // Stratégie : récupérer les IDs en base, calculer la différence, supprimer via .in()
 
-      // Supprimer les participants qui ont été définitivement supprimés
-      const currentParticipantIds = allParticipants.map(p => p.id);
-      if (currentParticipantIds.length > 0) {
-        const { error: errDelPart } = await supabase
-          .from('participants')
-          .delete()
-          .not('id', 'in', `(${currentParticipantIds.map(id => `'${id}'`).join(',')})`)
-        if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
-      }
-
-      // Supprimer les congrès qui ont été supprimés
+      // 1. Congrès supprimés
       const currentCongresIds = congresPayload.map(c => c.id);
-      if (currentCongresIds.length > 0) {
+      const { data: existingCongres } = await supabase.from('congres').select('id');
+      const congresIdsToDelete = (existingCongres || [])
+        .map((r: any) => r.id)
+        .filter((id: string) => !currentCongresIds.includes(id));
+      if (congresIdsToDelete.length > 0) {
         const { error: errDelCongres } = await supabase
-          .from('congres')
-          .delete()
-          .not('id', 'in', `(${currentCongresIds.map(id => `'${id}'`).join(',')})`)
+          .from('congres').delete().in('id', congresIdsToDelete);
         if (errDelCongres) console.error("Erreur DELETE congrès:", errDelCongres);
       }
 
-      // Pour l'historique : supprimer les entrées qui ne sont plus dans l'état
-      const currentHistoryIds = historyPayload.map((h) => h.id);
-      if (currentHistoryIds.length > 0) {
+      // 2. Participants supprimés définitivement (hors SUPPRIME qui reste en base)
+      const currentParticipantIds = allParticipants.map(p => p.id);
+      const { data: existingParticipants } = await supabase.from('participants').select('id');
+      const participantsIdsToDelete = (existingParticipants || [])
+        .map((r: any) => r.id)
+        .filter((id: string) => !currentParticipantIds.includes(id));
+      if (participantsIdsToDelete.length > 0) {
+        const { error: errDelPart } = await supabase
+          .from('participants').delete().in('id', participantsIdsToDelete);
+        if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
+      }
+
+      // 3. Historique supprimé
+      const currentHistoryIds = historyPayload.map(h => h.id);
+      const { data: existingHistory } = await supabase.from('export_history').select('id');
+      const historyIdsToDelete = (existingHistory || [])
+        .map((r: any) => r.id)
+        .filter((id: string) => !currentHistoryIds.includes(id));
+      if (historyIdsToDelete.length > 0) {
         const { error: errDelHist } = await supabase
-          .from('export_history')
-          .delete()
-          .not('id', 'in', `(${currentHistoryIds.map((id: string) => `'${id}'`).join(',')})`)
+          .from('export_history').delete().in('id', historyIdsToDelete);
         if (errDelHist) console.error("Erreur DELETE historique:", errDelHist);
-      } else {
-        // Si plus d'historique du tout, vider la table
-        await supabase.from('export_history').delete().neq('id', '');
       }
     };
 
