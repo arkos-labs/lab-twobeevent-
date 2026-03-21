@@ -603,118 +603,115 @@ export default function Dashboard() {
 
     // 2. Synchronisation en ligne (Supabase - Tables V2)
     const syncToDB = async () => {
-      // Upsert des paramètres
-      const { error: errSettings } = await supabase.from('settings').upsert({
-        id: 1,
-        email_template: emailTemplate
-      }, { onConflict: 'id' });
-      if (errSettings) console.error("Erreur Settings Supabase:", errSettings);
+      setSyncStatus('SYNCING');
+      try {
+        // Upsert des paramètres
+        const { error: errSettings } = await supabase.from('settings').upsert({
+          id: 1,
+          email_template: emailTemplate
+        }, { onConflict: 'id' });
+        if (errSettings) throw errSettings;
 
-      // Upsert de l'historique
-      const historyPayload = exportHistory.map((h, i) => ({
-        id: h.id || `${h.date}-${i}`, // Stable ID if available, fallback for old data
-        date: h.date,
-        description: h.congresName,
-        nb_participants: h.count
-      }));
-      if (historyPayload.length > 0) {
-        const { error: errHist } = await supabase.from('export_history').upsert(historyPayload, { onConflict: 'id' });
-        if (errHist) console.error("Erreur Historique Supabase:", errHist);
-      }
+        // Upsert de l'historique
+        const historyPayload = exportHistory.map((h, i) => ({
+          id: h.id || `${h.date}-${i}`,
+          date: h.date,
+          description: h.congresName,
+          nb_participants: h.count
+        }));
+        if (historyPayload.length > 0) {
+          const { error: errHist } = await supabase.from('export_history').upsert(historyPayload, { onConflict: 'id' });
+          if (errHist) throw errHist;
+        }
 
-      // Upsert des congrès
-      const congresPayload = congres.map(c => ({
-        id: c.id,
-        nom: c.nom,
-        date: c.date,
-        date_debut: c.dateDebut || c.date,
-        date_fin: c.dateFin,
-        lieu: c.lieu,
-        adresse: c.adresse,
-        archive: c.archive || false
-      }));
-      if (congresPayload.length > 0) {
-        const { error: errCongres } = await supabase.from('congres').upsert(congresPayload, { onConflict: 'id' });
-        if (errCongres) console.error("Erreur Congrès Supabase:", errCongres);
-      }
-
-      // Upsert de TOUS les participants de TOUS les congrès
-      const allParticipants = congres.flatMap(c =>
-        c.participants.map(p => ({
-          id: p.id,
-          congres_id: c.id,
-          nom: p.nom,
-          email: p.email,
-          telephone: p.telephone,
-          ville_depart: p.villeDepart,
-          statut: p.statut,
-          deja_exporte: p.dejaExporte || false,
+        // Upsert des congrès
+        const congresPayload = congres.map(c => ({
+          id: c.id,
+          nom: c.nom,
+          date: c.date,
           date_debut: c.dateDebut || c.date,
           date_fin: c.dateFin,
-          proposition_transport: p.logistique?.transports || [],
-          proposition_hotel: p.logistique?.hotels || []
-        }))
-      );
-
-      if (allParticipants.length > 0) {
-        setSyncStatus('SYNCING');
-        const { error: errPart } = await supabase.from('participants').upsert(
-          allParticipants.map(p => ({
-            ...p,
-            options_choisies: congres.flatMap(c => c.participants).find(cp => cp.id === p.id)?.optionsChoisies || '',
-            billets_envoyes: congres.flatMap(c => c.participants).find(cp => cp.id === p.id)?.billetsEnvoyes || false
-          })), 
-          { onConflict: 'id' }
-        );
-        
-        if (errPart) {
-          console.error("Erreur Participants Supabase:", errPart);
-          setSyncStatus('ERROR');
-          setDbError(errPart.message);
-        } else {
-          setSyncStatus('SUCCESS');
-          setDbError(null);
-          setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 2000);
+          lieu: c.lieu,
+          adresse: c.adresse,
+          archive: c.archive || false
+        }));
+        if (congresPayload.length > 0) {
+          const { error: errCongres } = await supabase.from('congres').upsert(congresPayload, { onConflict: 'id' });
+          if (errCongres) throw errCongres;
         }
-      }
 
-      // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
-      // Stratégie : récupérer les IDs en base, calculer la différence, supprimer via .in()
+        // Upsert des participants
+        const allParticipants = congres.flatMap(c =>
+          c.participants.map(p => ({
+            id: p.id,
+            congres_id: c.id,
+            nom: p.nom,
+            email: p.email,
+            telephone: p.telephone,
+            ville_depart: p.villeDepart,
+            statut: p.statut,
+            deja_exporte: p.dejaExporte || false,
+            date_debut: c.dateDebut || c.date,
+            date_fin: c.dateFin,
+            proposition_transport: p.logistique?.transports || [],
+            proposition_hotel: p.logistique?.hotels || [],
+            options_choisies: p.optionsChoisies || '',
+            billets_envoyes: p.billetsEnvoyes || false
+          }))
+        );
 
-      // 1. Congrès supprimés
-      const currentCongresIds = congresPayload.map(c => c.id);
-      const { data: existingCongres } = await supabase.from('congres').select('id');
-      const congresIdsToDelete = (existingCongres || [])
-        .map((r: any) => r.id)
-        .filter((id: string) => !currentCongresIds.includes(id));
-      if (congresIdsToDelete.length > 0) {
-        const { error: errDelCongres } = await supabase
-          .from('congres').delete().in('id', congresIdsToDelete);
-        if (errDelCongres) console.error("Erreur DELETE congrès:", errDelCongres);
-      }
+        if (allParticipants.length > 0) {
+          const { error: errPart } = await supabase.from('participants').upsert(allParticipants, { onConflict: 'id' });
+          if (errPart) throw errPart;
+        }
 
-      // 2. Participants supprimés définitivement (hors SUPPRIME qui reste en base)
-      const currentParticipantIds = allParticipants.map(p => p.id);
-      const { data: existingParticipants } = await supabase.from('participants').select('id');
-      const participantsIdsToDelete = (existingParticipants || [])
-        .map((r: any) => r.id)
-        .filter((id: string) => !currentParticipantIds.includes(id));
-      if (participantsIdsToDelete.length > 0) {
-        const { error: errDelPart } = await supabase
-          .from('participants').delete().in('id', participantsIdsToDelete);
-        if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
-      }
+        // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
+        // Stratégie : récupérer les IDs en base, calculer la différence, supprimer via .in()
 
-      // 3. Historique supprimé
-      const currentHistoryIds = historyPayload.map(h => h.id);
-      const { data: existingHistory } = await supabase.from('export_history').select('id');
-      const historyIdsToDelete = (existingHistory || [])
-        .map((r: any) => r.id)
-        .filter((id: string) => !currentHistoryIds.includes(id));
-      if (historyIdsToDelete.length > 0) {
-        const { error: errDelHist } = await supabase
-          .from('export_history').delete().in('id', historyIdsToDelete);
-        if (errDelHist) console.error("Erreur DELETE historique:", errDelHist);
+        // 1. Congrès supprimés
+        const currentCongresIds = congresPayload.map(c => c.id);
+        const { data: existingCongres } = await supabase.from('congres').select('id');
+        const congresIdsToDelete = (existingCongres || [])
+          .map((r: any) => r.id)
+          .filter((id: string) => !currentCongresIds.includes(id));
+        if (congresIdsToDelete.length > 0) {
+          const { error: errDelCongres } = await supabase
+            .from('congres').delete().in('id', congresIdsToDelete);
+          if (errDelCongres) console.error("Erreur DELETE congrès:", errDelCongres);
+        }
+
+        // 2. Participants supprimés définitivement (hors SUPPRIME qui reste en base)
+        const currentParticipantIds = allParticipants.map(p => p.id);
+        const { data: existingParticipants } = await supabase.from('participants').select('id');
+        const participantsIdsToDelete = (existingParticipants || [])
+          .map((r: any) => r.id)
+          .filter((id: string) => !currentParticipantIds.includes(id));
+        if (participantsIdsToDelete.length > 0) {
+          const { error: errDelPart } = await supabase
+            .from('participants').delete().in('id', participantsIdsToDelete);
+          if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
+        }
+
+        // 3. Historique supprimé
+        const currentHistoryIds = historyPayload.map(h => h.id);
+        const { data: existingHistory } = await supabase.from('export_history').select('id');
+        const historyIdsToDelete = (existingHistory || [])
+          .map((r: any) => r.id)
+          .filter((id: string) => !currentHistoryIds.includes(id));
+        if (historyIdsToDelete.length > 0) {
+          const { error: errDelHist } = await supabase
+            .from('export_history').delete().in('id', historyIdsToDelete);
+          if (errDelHist) console.error("Erreur DELETE historique:", errDelHist);
+        }
+
+        setSyncStatus('SUCCESS');
+        setDbError(null);
+        setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 3000);
+
+      } catch (err: any) {
+        console.error("Sync Error:", err);
+        setSyncStatus('ERROR');
+        setDbError(err.message || String(err));
       }
     };
 
