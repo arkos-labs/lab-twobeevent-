@@ -85,17 +85,22 @@ export async function POST(req: Request) {
 
             const applyCorrespondance = (trajet: Trajet, segments: any[] = []) => {
                 if (!trajet) return trajet;
-                if ((!trajet.correspondanceLieu || !trajet.correspondanceHeure) && Array.isArray(segments) && segments.length > 1) {
-                    const escale = segments[0];
-                    const next = segments[1];
-                    trajet.correspondanceLieu = escale?.lieuArrivee || '';
-                    trajet.correspondanceHeure = next?.depart || '';
-                    trajet.correspondanceArrivee = next?.arrivee || '';
-                    trajet.correspondanceNumero = next?.numero || '';
-                    trajet.correspondanceDate = trajet.date || '';
+                
+                // Si on a des segments détaillés, on les utilise pour enrichir le trajet
+                if (Array.isArray(segments) && segments.length > 1) {
+                    const firstLeg = segments[0];
+                    const secondLeg = segments[1];
+                    
+                    // On ne remplit que si les champs sont vides ou si on veut forcer la précision des segments
+                    if (!trajet.correspondanceLieu) trajet.correspondanceLieu = firstLeg?.lieuArrivee || '';
+                    if (!trajet.correspondanceArrivee) trajet.correspondanceArrivee = firstLeg?.arrivee || '';
+                    if (!trajet.correspondanceHeure) trajet.correspondanceHeure = secondLeg?.depart || '';
+                    if (!trajet.correspondanceNumero) trajet.correspondanceNumero = secondLeg?.numero || '';
+                    if (!trajet.correspondanceDate) trajet.correspondanceDate = trajet.date || '';
                 }
                 return trajet;
             };
+
 
 
             // Si l'extension envoie déjà un objet avec aller/retour
