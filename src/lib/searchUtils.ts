@@ -3,7 +3,9 @@ export function openGoogleFlights(
   destination: string,
   dateAller: string,   // format YYYY-MM-DD
   dateRetour?: string,
-  heureDebut?: string  // format HH:mm
+  heureDebut?: string,  // format HH:mm
+  congresId?: string,
+  participantId?: string
 ) {
   // Nettoyer les villes (enlever les codes postaux, etc.)
   const cleanCity = (str: string) =>
@@ -21,7 +23,10 @@ export function openGoogleFlights(
 
   // L'ajout de "/search" est CRUCIAL pour que Google Flights interprète le paramètre q
   const query = `${from} ${to} ${dAller} ${dRetour}`;
-  const url = `https://www.google.com/travel/flights/search?q=${encodeURIComponent(query)}`;
+  let url = `https://www.google.com/travel/flights/search?q=${encodeURIComponent(query)}`;
+  
+  if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
+  if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
 
   window.open(url, '_blank');
 }
@@ -30,7 +35,9 @@ export function openGoogleFlights(
 export function openGoogleHotels(
   city: string,
   checkIn?: string,
-  checkOut?: string
+  checkOut?: string,
+  congresId?: string,
+  participantId?: string
 ) {
   const cleanCity = (str: string) =>
     str.replace(/\(.*?\)/g, '').trim();
@@ -51,11 +58,15 @@ export function openGoogleHotels(
   
   const dates = checkIn ? `&dates=${checkIn}` + (checkOut ? `,${checkOut}` : '') : '';
   
-  window.open(base + filters + dates, '_blank');
+  let url = base + filters + dates;
+  if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
+  if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+
+  window.open(url, '_blank');
 }
 
 // Ouvre SNCF Connect pré-rempli (trains)
-export function openSNCF(origin: string, destination: string, date: string, dateRetour?: string, heureDebut?: string) {
+export function openSNCF(origin: string, destination: string, date: string, dateRetour?: string, heureDebut?: string, congresId?: string, participantId?: string) {
   const cleanCity = (str: string) =>
     str.replace(/\(.*?\)/g, '').trim().split(' ')[0];
   const from = cleanCity(origin);
@@ -75,6 +86,9 @@ export function openSNCF(origin: string, destination: string, date: string, date
 
   if (dRetour) query += ` et retour le ${dRetour}`;
 
-  const url = `https://www.sncf-connect.com/home/search?userInput=${encodeURIComponent(query)}`;
+  let url = `https://www.sncf-connect.com/home/search?userInput=${encodeURIComponent(query)}`;
+  if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
+  if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+
   window.open(url, '_blank');
 }

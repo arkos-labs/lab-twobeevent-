@@ -1595,13 +1595,13 @@ export default function Dashboard() {
                           </p>
                           <div className="flex gap-2 mr-24">
                             <button
-                              onClick={() => selectedCongres && openGoogleFlights(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date)}
+                              onClick={() => selectedCongres && openGoogleFlights(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Plane className="w-2.5 h-2.5" /> Vols
                             </button>
                             <button
-                              onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date)}
+                              onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Train className="w-2.5 h-2.5" /> Train
@@ -1647,13 +1647,13 @@ export default function Dashboard() {
                           </p>
                           <div className="flex gap-2">
                             <button
-                              onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date)}
+                              onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Plane className="w-2.5 h-2.5" /> Vols
                             </button>
                             <button
-                              onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date)}
+                              onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Train className="w-2.5 h-2.5" /> Train
@@ -1707,7 +1707,9 @@ export default function Dashboard() {
                       onClick={() => openGoogleHotels(
                         selectedCongres.lieu || selectedCongres.nom,
                         selectedCongres.dateDebut || selectedCongres.date,
-                        selectedCongres.dateFin
+                        selectedCongres.dateFin,
+                        selectedCongres.id,
+                        currentParticipant.id
                       )}
                       className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                       title="Filtres auto : 3-4*, max 150€ TTC, petit-déjeuner inclus"
