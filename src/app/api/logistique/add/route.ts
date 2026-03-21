@@ -52,10 +52,27 @@ export async function POST(req: Request) {
 
         // 3. Traiter l'ajout du transport si présent
         if (transport) {
+            const parseDateLabel = (label?: string) => {
+                if (!label) return '';
+                // Example: "Aller : Lun. 23 mars 05:31"
+                const months: Record<string, string> = {
+                    'janvier': '01', 'février': '02', 'fevrier': '02', 'mars': '03', 'avril': '04',
+                    'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08', 'aout': '08',
+                    'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12', 'decembre': '12'
+                };
+                const m = label.toLowerCase().match(/(\d{1,2})\s+([a-zéû]+)\b/);
+                if (!m) return '';
+                const day = m[1].padStart(2, '0');
+                const month = months[m[2]];
+                if (!month) return '';
+                const year = new Date().getFullYear().toString();
+                return `${year}-${month}-${day}`;
+            };
+
             const mapTrajet = (t: any): Trajet => ({
                 type: t?.type || 'TRAIN',
                 numero: t?.numero || t?.trainNumber || '',
-                date: t?.date || t?.dateLabel || '',
+                date: t?.date || parseDateLabel(t?.dateLabel) || t?.dateLabel || '',
                 depart: t?.depart || t?.departureTime || '',
                 arrivee: t?.arrivee || t?.arrivalTime || '',
                 lieuDepart: t?.lieuDepart || t?.depart || t?.departure || '',
