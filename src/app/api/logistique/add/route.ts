@@ -7,12 +7,18 @@ import type { PropositionTransport, PropositionHotel, Trajet } from '@/lib/types
  * Endpoint: /api/logistique/add
  */
 export async function POST(req: Request) {
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    };
+
     try {
         const body = await req.json();
         const { participantId, hotel, transport } = body;
 
         if (!participantId) {
-            return NextResponse.json({ error: "Participant ID manquant" }, { status: 400 });
+            return NextResponse.json({ error: "Participant ID manquant" }, { status: 400, headers: corsHeaders });
         }
 
         // 1. Récupérer le participant actuel pour avoir ses propositions existantes
@@ -23,7 +29,7 @@ export async function POST(req: Request) {
             .single();
 
         if (fetchError || !participant) {
-            return NextResponse.json({ error: "Participant non trouvé dans Supabase" }, { status: 404 });
+            return NextResponse.json({ error: "Participant non trouvé dans Supabase" }, { status: 404, headers: corsHeaders });
         }
 
         let newHotels = participant.proposition_hotel || [];
@@ -90,14 +96,18 @@ export async function POST(req: Request) {
             success: true, 
             message: "Données ajoutées avec succès",
             data: { hotelsCount: newHotels.length, transportsCount: newTransports.length }
-        });
+        }, { headers: corsHeaders });
 
     } catch (error: any) {
         console.error("[API Logistique Error]:", error);
         return NextResponse.json({ 
             error: "Erreur lors de l'enregistrement des données", 
             details: error.message 
-        }, { status: 500 });
+        }, { status: 500, headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }});
     }
 }
 
