@@ -1656,13 +1656,13 @@ export default function Dashboard() {
                           </p>
                           <div className="flex gap-2 mr-24">
                             <button
-                              onClick={() => selectedCongres && openGoogleFlights(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
+                              onClick={() => selectedCongres && openGoogleFlights(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, prop.retour.date || selectedCongres.dateFin, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Plane className="w-2.5 h-2.5" /> Vols
                             </button>
                             <button
-                              onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
+                              onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, prop.retour.date || selectedCongres.dateFin, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
                               <Train className="w-2.5 h-2.5" /> Train
