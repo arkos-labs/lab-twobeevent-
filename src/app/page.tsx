@@ -135,6 +135,7 @@ export default function Dashboard() {
   const [isDark, setIsDark] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [dbError, setDbError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -185,18 +186,9 @@ export default function Dashboard() {
     };
 
     // Mise à jour de l'état React
-    setCongres(prev => {
-      const updated = [...prev, newCongres];
-      // Sauvegarde immédiate dans LocalStorage (ne pas attendre le useEffect)
-      try {
-        localStorage.setItem('logitools_data', JSON.stringify(updated));
-      } catch (e) {
-        console.error('[handleAddCongres] localStorage error:', e);
-      }
-      return updated;
-    });
-
-    // Marquer que l'utilisateur a deja agi → empeche initData d'ecraser l'etat
+    setCongres(prev => [...prev, newCongres]);
+    
+    // Marquer que l'utilisateur a deja agi
     initializedRef.current = true;
 
     setSelectedId(id);
@@ -562,77 +554,52 @@ export default function Dashboard() {
     });
   };
 
-  // ─── Chargement DB (Supabase avec repli LocalStorage) ───
+  // ─── Chargement DB (Supabase Uniquement) ───
   const initializedRef = React.useRef(false);
 
   React.useEffect(() => {
     async function initData() {
-      const { data: dataCongres } = await supabase.from('congres').select('*');
-      const { data: dataParticipants } = await supabase.from('participants').select('*');
-      const { data: dataHistory } = await supabase.from('export_history').select('*');
-      const { data: dataSettings } = await supabase.from('settings').select('*').eq('id', 1).single();
+      setLoading(true);
+      try {
+        const { data: dataCongres } = await supabase.from('congres').select('*');
+        const { data: dataParticipants } = await supabase.from('participants').select('*');
+        const { data: dataHistory } = await supabase.from('export_history').select('*');
+        const { data: dataSettings } = await supabase.from('settings').select('*').eq('id', 1).single();
 
-      // Si l'utilisateur a deja agi (cree un congres) pendant le chargement, on n'ecrase pas
-      if (initializedRef.current) return;
+        if (initializedRef.current) return;
 
-      let finalCongres: Congres[] = [];
-      let finalHistory: ExportHistory[] = [];
-      let finalTemplate = {
-        subject: "Proposition Logistique - {CONGRES}",
-        body: "Bonjour {NOM},\n\nDans le cadre de votre participation au congrès \"{CONGRES}\", nous avons le plaisir de vous soumettre notre proposition logistique.\n\nVous trouverez en pièce jointe un PDF récapitulatif avec {NB_TRANS} option(s) de transport et {NB_HOTEL} option(s) d'hébergement.\n\nMerci d'indiquer l'Option N° qui vous convient.\n\nCordialement,\nL'équipe Logistique"
-      };
+        let finalCongres: Congres[] = [];
+        let finalHistory: ExportHistory[] = [];
+        let finalTemplate = {
+          subject: "Proposition Logistique - {CONGRES}",
+          body: "Bonjour {NOM},\n\nDans le cadre de votre participation au congrès \"{CONGRES}\", nous avons le plaisir de vous soumettre notre proposition logistique.\n\nVous trouverez en pièce jointe un PDF récapitulatif avec {NB_TRANS} option(s) de transport et {NB_HOTEL} option(s) d'hébergement.\n\nMerci d'indiquer l'Option N° qui vous convient.\n\nCordialement,\nL'équipe Logistique"
+        };
 
-      // dataCongres !== null signifie que Supabase est configure et a repondu
-      if (dataCongres !== null && dataCongres.length > 0) {
-        finalCongres = dataCongres.map((c: any) => normalizeCongres(c, dataParticipants || []));
-        if (dataHistory && dataHistory.length > 0) {
-          finalHistory = (dataHistory as ExportHistoryRow[]).map(normalizeHistoryRow);
+        if (dataCongres) {
+          finalCongres = dataCongres.map((c: any) => normalizeCongres(c, dataParticipants || []));
+          if (dataHistory) {
+            finalHistory = (dataHistory as ExportHistoryRow[]).map(normalizeHistoryRow);
+          }
+          if (dataSettings?.email_template) finalTemplate = dataSettings.email_template;
         }
-        if (dataSettings?.email_template) finalTemplate = dataSettings.email_template;
-      } else {
-        // Fallback LocalStorage (Supabase non configure, vide ou erreur)
-        const saved = localStorage.getItem('logitools_data');
-        const savedHistory = localStorage.getItem('logitools_history');
-        const savedTemplate = localStorage.getItem('logitools_template');
 
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            finalCongres = Array.isArray(parsed)
-              ? parsed.map((c: any) => ({
-                ...normalizeCongres(c, c.participants || []),
-                participants: (c.participants || []).map(normalizeParticipant)
-              }))
-              : [];
-          } catch (e) { console.error('[initData] localStorage parse error:', e); }
-        }
-        if (savedHistory) {
-          try {
-            const parsedHistory = JSON.parse(savedHistory);
-            finalHistory = Array.isArray(parsedHistory) ? parsedHistory.map(normalizeHistoryRow) : [];
-          } catch (e) { /* ignore */ }
-        }
-        if (savedTemplate) {
-          try { finalTemplate = JSON.parse(savedTemplate); } catch (e) { /* ignore */ }
-        }
+        setCongres(finalCongres);
+        setExportHistory(finalHistory);
+        setEmailTemplate(finalTemplate);
+        initializedRef.current = true;
+      } catch (err) {
+        console.error("Init Error:", err);
+      } finally {
+        setLoading(false);
       }
-
-      initializedRef.current = true;
-      setCongres(finalCongres);
-      setExportHistory(finalHistory);
-      setEmailTemplate(finalTemplate);
     }
     initData();
   }, []);
 
-  // ─── Synchronisation DB & LocalStorage ───
+  // ─── Synchronisation Supabase Uniquement ───
   React.useEffect(() => {
-    if (congres.length === 0 && exportHistory.length === 0) return; // Évite d'écraser la DB au mount initial
-
-    // 1. Double sauvegarde locale par sécurité
-    localStorage.setItem('logitools_data', JSON.stringify(congres));
-    localStorage.setItem('logitools_history', JSON.stringify(exportHistory));
-    localStorage.setItem('logitools_template', JSON.stringify(emailTemplate));
+    if (loading) return; // Ne pas synchroniser tant que le premier chargement n'est pas fini
+    if (!initializedRef.current) return;
 
     // 2. Synchronisation en ligne (Supabase - Tables V2)
     const syncToDB = async () => {
