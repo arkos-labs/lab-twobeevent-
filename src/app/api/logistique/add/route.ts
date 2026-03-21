@@ -52,32 +52,47 @@ export async function POST(req: Request) {
 
         // 3. Traiter l'ajout du transport si présent
         if (transport) {
-            // L'extension envoie généralement un trajet (Aller) 
-            // On le prépare selon le type PropositionTransport qui attend (Aller + Retour)
-            const trajetVide = (): Trajet => ({
-                type: transport.type || 'TRAIN',
-                numero: '',
-                date: '',
-                depart: '',
-                arrivee: '',
-                lieuDepart: '',
-                lieuArrivee: ''
+            const mapTrajet = (t: any): Trajet => ({
+                type: t?.type || 'TRAIN',
+                numero: t?.numero || t?.trainNumber || '',
+                date: t?.date || t?.dateLabel || '',
+                depart: t?.depart || t?.departureTime || '',
+                arrivee: t?.arrivee || t?.arrivalTime || '',
+                lieuDepart: t?.lieuDepart || t?.depart || t?.departure || '',
+                lieuArrivee: t?.lieuArrivee || t?.arrivee || t?.arrival || '',
+                correspondanceLieu: t?.correspondanceLieu || '',
+                correspondanceHeure: t?.correspondanceHeure || '',
+                correspondanceNumero: t?.correspondanceNumero || ''
             });
 
-            const transportToAdd: PropositionTransport = {
-                aller: {
-                    ...trajetVide(),
-                    ...transport, // On écrase les champs par les données capturées
-                    // S'il y a des champs mappés différemment (ex: name vs lieuDepart)
-                    lieuDepart: transport.departure || transport.lieuDepart || '',
-                    lieuArrivee: transport.arrival || transport.lieuArrivee || '',
-                    date: transport.date || '',
-                    numero: transport.number || transport.numero || ''
-                },
-                retour: trajetVide() // Par défaut le retour est vide, à compléter manuellement ou par une autre capture
+            const applyCorrespondance = (trajet: Trajet, segments: any[] = []) => {
+                if (!trajet) return trajet;
+                if ((!trajet.correspondanceLieu || !trajet.correspondanceHeure) && Array.isArray(segments) && segments.length > 1) {
+                    const escale = segments[0];
+                    const next = segments[1];
+                    trajet.correspondanceLieu = escale?.lieuArrivee || '';
+                    trajet.correspondanceHeure = escale?.arrivee || '';
+                    trajet.correspondanceNumero = next?.numero || '';
+                }
+                return trajet;
             };
-            newTransports.push(transportToAdd);
+
+            // Si l'extension envoie déjà un objet avec aller/retour
+            if (transport.aller || transport.retour) {
+                const aller = applyCorrespondance(mapTrajet(transport.aller), transport.segmentsAller);
+                const retour = applyCorrespondance(mapTrajet(transport.retour), transport.segmentsRetour);
+                const transportToAdd: PropositionTransport = { aller, retour };
+                newTransports.push(transportToAdd);
+            } else {
+                // Ancien format (un seul trajet envoyé)
+                const transportToAdd: PropositionTransport = {
+                    aller: mapTrajet(transport),
+                    retour: mapTrajet(null) // Retour vide
+                };
+                newTransports.push(transportToAdd);
+            }
         }
+
 
         // 4. Mettre à jour Supabase
         const { error: updateError } = await supabase
