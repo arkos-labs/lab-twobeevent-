@@ -132,12 +132,19 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ── Dark Mode ──
-  const [isDark, setIsDark] = useState(() => {
+  const [isDark, setIsDark] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
+      const saved = localStorage.getItem('logitools_theme');
+      if (saved === 'dark') {
+        document.documentElement.classList.add('dark');
+        setIsDark(true);
+      }
     }
-    return false;
-  });
+  }, []);
 
   const toggleDark = () => {
     const next = !isDark;
@@ -683,8 +690,25 @@ export default function Dashboard() {
       );
 
       if (allParticipants.length > 0) {
-        const { error: errPart } = await supabase.from('participants').upsert(allParticipants, { onConflict: 'id' });
-        if (errPart) console.error("Erreur Participants Supabase:", errPart);
+        setSyncStatus('SYNCING');
+        const { error: errPart } = await supabase.from('participants').upsert(
+          allParticipants.map(p => ({
+            ...p,
+            options_choisies: congres.flatMap(c => c.participants).find(cp => cp.id === p.id)?.optionsChoisies || '',
+            billets_envoyes: congres.flatMap(c => c.participants).find(cp => cp.id === p.id)?.billetsEnvoyes || false
+          })), 
+          { onConflict: 'id' }
+        );
+        
+        if (errPart) {
+          console.error("Erreur Participants Supabase:", errPart);
+          setSyncStatus('ERROR');
+          setDbError(errPart.message);
+        } else {
+          setSyncStatus('SUCCESS');
+          setDbError(null);
+          setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 2000);
+        }
       }
 
       // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
@@ -910,6 +934,26 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {syncStatus === 'SYNCING' && (
+              <div className="flex items-center gap-2 text-[10px] font-black italic text-blue-500 animate-pulse bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100">
+                <Database className="w-3 h-3" /> SYNCHRONISATION...
+              </div>
+            )}
+            {syncStatus === 'ERROR' && (
+              <button 
+                onClick={() => setHistoryOpen(true)} // Or some status modal
+                title={dbError || "Erreur de connexion"}
+                className="flex items-center gap-2 text-[10px] font-black italic text-red-500 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 uppercase tracking-tighter"
+              >
+                <AlertCircle className="w-3 h-3" /> Base de données : Erreur
+              </button>
+            )}
+            {syncStatus === 'SUCCESS' && (
+              <div className="flex items-center gap-2 text-[10px] font-black italic text-emerald-500 bg-emerald-px-3 py-1.5 rounded-lg">
+                <CheckCircle2 className="w-3 h-3" /> Sauvegardé
+              </div>
+            )}
+
             <button
               onClick={() => setHistoryOpen(true)}
               className="hidden sm:flex px-4 py-2.5 rounded-xl bg-gray-50 text-gray-500 hover:text-blue-600 transition-all border border-gray-100 items-center gap-2 text-xs font-bold"
