@@ -27,6 +27,7 @@ export function openGoogleFlights(
   
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+  url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
   window.open(url, '_blank');
 }
@@ -61,6 +62,7 @@ export function openGoogleHotels(
   let url = base + filters + dates;
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+  url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
   window.open(url, '_blank');
 }
@@ -89,6 +91,7 @@ export function openSNCF(origin: string, destination: string, date: string, date
   let url = `https://www.sncf-connect.com/home/search?userInput=${encodeURIComponent(query)}`;
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+  url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
   window.open(url, '_blank');
 }

@@ -55,6 +55,7 @@ export interface Congres {
 }
 
 export interface ExportHistory {
+  id?: string;
   date: string;
   count: number;
   congresName: string;

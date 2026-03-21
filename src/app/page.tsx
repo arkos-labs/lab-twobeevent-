@@ -6,7 +6,7 @@ import {
   MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
-  Moon, Sun
+  Moon, Sun, Wand2, Zap
 } from 'lucide-react';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import { openGoogleFlights, openGoogleHotels, openSNCF } from '@/lib/searchUtils';
@@ -71,6 +71,7 @@ const normalizeCongres = (c: any, allParticipants: any[] = []): Congres => ({
 });
 
 const normalizeHistoryRow = (h: any): ExportHistory => ({
+  id: h.id,
   date: h.date,
   count: h.nb_participants ?? h.count ?? 0,
   congresName: h.description ?? h.congresName ?? ''
@@ -163,7 +164,7 @@ export default function Dashboard() {
   const handleAddCongres = () => {
     if (!newNom.trim()) return;
     const id = crypto.randomUUID();
-    setCongres(prev => [...prev, {
+    const newCongres = {
       id,
       nom: newNom.trim(),
       date: newDate,
@@ -172,9 +173,25 @@ export default function Dashboard() {
       lieu: newLieu,
       adresse: newAdresse,
       heure: newHeure,
-      participants: [],
+      participants: [] as Participant[],
       archive: false
-    }]);
+    };
+
+    // Mise à jour de l'état React
+    setCongres(prev => {
+      const updated = [...prev, newCongres];
+      // Sauvegarde immédiate dans LocalStorage (ne pas attendre le useEffect)
+      try {
+        localStorage.setItem('logitools_data', JSON.stringify(updated));
+      } catch (e) {
+        console.error('[handleAddCongres] localStorage error:', e);
+      }
+      return updated;
+    });
+
+    // Marquer que l'utilisateur a deja agi → empeche initData d'ecraser l'etat
+    initializedRef.current = true;
+
     setSelectedId(id);
     setNewNom('');
     setNewDate('');
@@ -214,6 +231,29 @@ export default function Dashboard() {
   const handleRestoreParticipant = (pid: string) => {
     if (!selectedId) return;
     updateParticipants(selectedId, ps => ps.map(p => p.id === pid ? { ...p, statut: 'A_TRAITER' } : p));
+  };
+
+  const handleDeleteHistory = (id?: string) => {
+    if (!id) return;
+    if (!window.confirm("Supprimer cette entrée de l'historique ?")) return;
+    setExportHistory(prev => prev.filter(h => (h.id || `${h.date}-${prev.indexOf(h)}`) !== id));
+  };
+
+  const handleCleanHistoryDupes = () => {
+    setExportHistory(prev => {
+      const seen = new Set<string>();
+      return prev.filter(h => {
+        const key = `${h.date}-${h.congresName}-${h.count}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    });
+  };
+
+  const handleClearHistory = () => {
+    if (!window.confirm("Tout supprimer définitivement l'historique ?")) return;
+    setExportHistory([]);
   };
 
   const handleEmptyTrash = () => {
@@ -440,6 +480,7 @@ export default function Dashboard() {
     // 5. Enregistrer dans l'historique
     setExportHistory(prev => [
       {
+        id: crypto.randomUUID(),
         date: new Date().toLocaleString('fr-FR'),
         count: aExporter.length,
         congresName: selectedCongres.nom
@@ -515,13 +556,17 @@ export default function Dashboard() {
   };
 
   // ─── Chargement DB (Supabase avec repli LocalStorage) ───
+  const initializedRef = React.useRef(false);
+
   React.useEffect(() => {
     async function initData() {
-      // Chargement depuis les nouvelles tables Supabase
       const { data: dataCongres } = await supabase.from('congres').select('*');
       const { data: dataParticipants } = await supabase.from('participants').select('*');
       const { data: dataHistory } = await supabase.from('export_history').select('*');
       const { data: dataSettings } = await supabase.from('settings').select('*').eq('id', 1).single();
+
+      // Si l'utilisateur a deja agi (cree un congres) pendant le chargement, on n'ecrase pas
+      if (initializedRef.current) return;
 
       let finalCongres: Congres[] = [];
       let finalHistory: ExportHistory[] = [];
@@ -530,38 +575,42 @@ export default function Dashboard() {
         body: "Bonjour {NOM},\n\nDans le cadre de votre participation au congrès \"{CONGRES}\", nous avons le plaisir de vous soumettre notre proposition logistique.\n\nVous trouverez en pièce jointe un PDF récapitulatif avec {NB_TRANS} option(s) de transport et {NB_HOTEL} option(s) d'hébergement.\n\nMerci d'indiquer l'Option N° qui vous convient.\n\nCordialement,\nL'équipe Logistique"
       };
 
-      if (dataCongres && dataCongres.length > 0) {
-        // Reconstruction des objets imbriqués
+      // dataCongres !== null signifie que Supabase est configure et a repondu
+      if (dataCongres !== null && dataCongres.length > 0) {
         finalCongres = dataCongres.map((c: any) => normalizeCongres(c, dataParticipants || []));
-
         if (dataHistory && dataHistory.length > 0) {
           finalHistory = (dataHistory as ExportHistoryRow[]).map(normalizeHistoryRow);
         }
         if (dataSettings?.email_template) finalTemplate = dataSettings.email_template;
       } else {
-        // Fallback: Récupération de l'ancien LocalStorage si Supabase est vide
+        // Fallback LocalStorage (Supabase non configure, vide ou erreur)
         const saved = localStorage.getItem('logitools_data');
         const savedHistory = localStorage.getItem('logitools_history');
         const savedTemplate = localStorage.getItem('logitools_template');
 
         if (saved) {
-          const parsed = JSON.parse(saved);
-          finalCongres = Array.isArray(parsed)
-            ? parsed.map((c: any) => ({
-              ...normalizeCongres(c, c.participants || []),
-              participants: (c.participants || []).map(normalizeParticipant)
-            }))
-            : [];
+          try {
+            const parsed = JSON.parse(saved);
+            finalCongres = Array.isArray(parsed)
+              ? parsed.map((c: any) => ({
+                ...normalizeCongres(c, c.participants || []),
+                participants: (c.participants || []).map(normalizeParticipant)
+              }))
+              : [];
+          } catch (e) { console.error('[initData] localStorage parse error:', e); }
         }
         if (savedHistory) {
-          const parsedHistory = JSON.parse(savedHistory);
-          finalHistory = Array.isArray(parsedHistory)
-            ? parsedHistory.map(normalizeHistoryRow)
-            : [];
+          try {
+            const parsedHistory = JSON.parse(savedHistory);
+            finalHistory = Array.isArray(parsedHistory) ? parsedHistory.map(normalizeHistoryRow) : [];
+          } catch (e) { /* ignore */ }
         }
-        if (savedTemplate) finalTemplate = JSON.parse(savedTemplate);
+        if (savedTemplate) {
+          try { finalTemplate = JSON.parse(savedTemplate); } catch (e) { /* ignore */ }
+        }
       }
 
+      initializedRef.current = true;
       setCongres(finalCongres);
       setExportHistory(finalHistory);
       setEmailTemplate(finalTemplate);
@@ -589,7 +638,7 @@ export default function Dashboard() {
 
       // Upsert de l'historique
       const historyPayload = exportHistory.map((h, i) => ({
-        id: `${h.date}-${i}`,
+        id: h.id || `${h.date}-${i}`, // Stable ID if available, fallback for old data
         date: h.date,
         description: h.congresName,
         nb_participants: h.count
@@ -1391,16 +1440,21 @@ export default function Dashboard() {
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-4">Nom de l'événement</label>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-4">Nom de l'événement <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   placeholder="e.g. Cardiology Forum 2025"
-                  className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                  className={`w-full bg-gray-50 border-2 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none transition-all ${
+                    newNom.trim() === '' ? 'border-red-200 focus:border-red-300' : 'border-transparent focus:border-blue-200'
+                  }`}
                   value={newNom}
                   onChange={e => setNewNom(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddCongres()}
                   autoFocus
                 />
+                {newNom.trim() === '' && (
+                  <p className="text-[11px] text-red-400 font-bold ml-4">⚠️ Le nom de l'événement est requis</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1451,6 +1505,7 @@ export default function Dashboard() {
                       setAddressSuggestions([]);
                     }
                   }}
+                  onBlur={() => setTimeout(() => setAddressSuggestions([]), 200)}
                 />
                 {addressSuggestions.length > 0 && (
                   <div className="absolute top-[100%] left-0 right-0 z-[100] mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -1458,6 +1513,7 @@ export default function Dashboard() {
                       <button
                         key={i}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setNewAdresse(s.label);
                           setAddressSuggestions([]);
@@ -1493,7 +1549,12 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={handleAddCongres}
-                className="flex-1 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 transition-all shadow-blue-200"
+                disabled={!newNom.trim()}
+                className={`flex-1 px-8 py-4 rounded-2xl font-bold shadow-lg transition-all ${
+                  newNom.trim()
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:translate-y-[-1px]'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 Créer l'événement
               </button>
@@ -1793,12 +1854,32 @@ export default function Dashboard() {
                 <h3 className="text-2xl font-black italic">Historique des Exports</h3>
                 <p className="text-gray-400 text-sm font-medium mt-1">Trace de tous les fichiers envoyés à l'agence.</p>
               </div>
-              <button
-                onClick={() => setHistoryOpen(false)}
-                className="w-12 h-12 bg-gray-50 hover:bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 transition-all font-black text-xl italic"
-              >
-                X
-              </button>
+              <div className="flex items-center gap-3">
+                {exportHistory.length > 0 && (
+                  <div className="flex gap-2 mr-2">
+                    <button
+                      onClick={handleCleanHistoryDupes}
+                      title="Supprimer les doublons"
+                      className="w-10 h-10 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center transition-all"
+                    >
+                      <Wand2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleClearHistory}
+                      title="Tout effacer"
+                      className="w-10 h-10 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl flex items-center justify-center transition-all"
+                    >
+                      <Zap className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={() => setHistoryOpen(false)}
+                  className="w-12 h-12 bg-gray-50 hover:bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 transition-all font-black text-xl italic"
+                >
+                  X
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-10 space-y-4">
@@ -1818,10 +1899,17 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-400 font-medium">{h.date}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-3 text-right">
                       <span className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black shadow-sm">
                         {h.count} MÉDECINS
                       </span>
+                      <button
+                        onClick={() => handleDeleteHistory(h.id || `${h.date}-${i}`)}
+                        className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                        title="Supprimer cette entrée"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))
