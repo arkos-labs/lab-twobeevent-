@@ -866,6 +866,10 @@ export default function Dashboard() {
             </div>
             <Settings className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
           </div>
+
+          <div className="mt-4 px-2 text-[8px] font-black text-gray-300 uppercase tracking-widest text-center">
+            Logitools v1.5.1 • Supabase Sync
+          </div>
         </div>
       </aside>
 
