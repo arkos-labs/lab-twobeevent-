@@ -25,10 +25,13 @@ const trajetVide = (): Trajet => ({
   arrivee: '',
   lieuDepart: '',
   lieuArrivee: '',
-  correspondanceLieu: undefined,
-  correspondanceHeure: undefined,
-  correspondanceDate: undefined
+  correspondanceLieu: '',
+  correspondanceHeure: '',
+  correspondanceArrivee: '',
+  correspondanceDate: '',
+  correspondanceNumero: ''
 });
+
 
 const validateEmail = (email: string) => {
   if (!email) return false;
@@ -1700,11 +1703,21 @@ export default function Dashboard() {
                           <div className="relative px-6">
                             <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-blue-100"></div>
                             <div className="flex gap-2 items-center bg-blue-50/50 p-2 rounded-xl">
-                              <span className="text-[9px] font-black text-blue-300 uppercase shrink-0">Escale</span>
-                              <input type="text" placeholder="Ville d'escale (optionnel)" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
-                              <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-20" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
+                              <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
+                                <option value="TRAIN">🚆</option>
+                                <option value="FLIGHT">✈️</option>
+                              </select>
+                              <input type="text" placeholder="Ville d'escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
+                              <input type="text" placeholder="N°" className="w-20 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
+                              <input type="date" className="bg-transparent border-none p-1 text-[10px] font-bold w-28" value={prop.aller.correspondanceDate || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} />
+                              <div className="flex items-center gap-1 px-2 border-l border-blue-200">
+                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
+                                <span className="text-blue-300 text-[10px]">→</span>
+                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.aller.correspondanceArrivee || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceArrivee', e.target.value)} />
+                              </div>
                             </div>
                           </div>
+
 
                           <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-blue-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
                         </div>
@@ -1752,11 +1765,21 @@ export default function Dashboard() {
                           <div className="relative px-6">
                             <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-orange-100"></div>
                             <div className="flex gap-2 items-center bg-orange-50/50 p-2 rounded-xl">
-                              <span className="text-[9px] font-black text-orange-300 uppercase tracking-widest shrink-0">Escale</span>
-                              <input type="text" placeholder="Ville d'escale (optionnel)" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
-                              <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-20" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
+                              <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
+                                <option value="TRAIN">🚆</option>
+                                <option value="FLIGHT">✈️</option>
+                              </select>
+                              <input type="text" placeholder="Ville d'escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
+                              <input type="text" placeholder="N°" className="w-20 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
+                              <input type="date" className="bg-transparent border-none p-1 text-[10px] font-bold w-28" value={prop.retour.correspondanceDate || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} />
+                              <div className="flex items-center gap-1 px-2 border-l border-orange-200">
+                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
+                                <span className="text-orange-300 text-[10px]">→</span>
+                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.retour.correspondanceArrivee || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceArrivee', e.target.value)} />
+                              </div>
                             </div>
                           </div>
+
 
                           <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-orange-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
                         </div>

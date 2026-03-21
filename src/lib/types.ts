@@ -8,9 +8,11 @@ export interface Trajet {
   lieuArrivee: string;
   correspondanceLieu?: string;
   correspondanceHeure?: string;
+  correspondanceArrivee?: string;
   correspondanceDate?: string;
   correspondanceNumero?: string;
 }
+
 
 export interface PropositionTransport {
   aller: Trajet;

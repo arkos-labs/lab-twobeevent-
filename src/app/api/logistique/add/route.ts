@@ -79,6 +79,7 @@ export async function POST(req: Request) {
                 lieuArrivee: t?.lieuArrivee || t?.arrivee || t?.arrival || '',
                 correspondanceLieu: t?.correspondanceLieu || '',
                 correspondanceHeure: t?.correspondanceHeure || '',
+                correspondanceArrivee: t?.correspondanceArrivee || '',
                 correspondanceNumero: t?.correspondanceNumero || ''
             });
 
@@ -88,12 +89,14 @@ export async function POST(req: Request) {
                     const escale = segments[0];
                     const next = segments[1];
                     trajet.correspondanceLieu = escale?.lieuArrivee || '';
-                    trajet.correspondanceHeure = escale?.arrivee || '';
+                    trajet.correspondanceHeure = next?.depart || '';
+                    trajet.correspondanceArrivee = next?.arrivee || '';
                     trajet.correspondanceNumero = next?.numero || '';
                     trajet.correspondanceDate = trajet.date || '';
                 }
                 return trajet;
             };
+
 
             // Si l'extension envoie déjà un objet avec aller/retour
             if (transport.aller || transport.retour) {
