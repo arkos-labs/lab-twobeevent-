@@ -44,8 +44,11 @@ export interface Participant {
 export interface Congres {
   id: string;
   nom: string;
-  date: string;
+  date: string; // Gardé pour la compatibilité (sera dateDebut par défaut)
+  dateDebut?: string; // Format YYYY-MM-DD
+  dateFin?: string;   // Format YYYY-MM-DD
   lieu: string;
+  adresse?: string;   // Nouvelle adresse complète de l'événement
   heure?: string;
   participants: Participant[];
   archive?: boolean;

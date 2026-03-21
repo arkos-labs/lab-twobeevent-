@@ -7,6 +7,7 @@ CREATE TABLE public.congres (
   nom text NOT NULL,
   date text,
   lieu text,
+  adresse text,
   archive boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now()
 );

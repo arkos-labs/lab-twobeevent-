@@ -3,12 +3,14 @@
 import React, { useState, useRef } from 'react';
 import {
   FileUp, Users, CheckCircle2, Loader2, FileDown,
-  MailCheck, Mail, Edit3, X, Plus, Trash2, Calendar,
+  MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
   Moon, Sun
 } from 'lucide-react';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
+import { openGoogleFlights, openGoogleHotels, openSNCF } from '@/lib/searchUtils';
+import { fetchAddressSuggestions } from '@/lib/autocomplete';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import type { Congres, ExportHistory, ExportHistoryRow, Participant, PropositionHotel, PropositionTransport, Trajet } from '@/lib/types';
@@ -56,8 +58,11 @@ const normalizeParticipant = (p: any): Participant => {
 const normalizeCongres = (c: any, allParticipants: any[] = []): Congres => ({
   id: c.id,
   nom: c.nom || '',
-  date: c.date || '',
+  date: c.date || c.date_debut || '',
+  dateDebut: c.date_debut || c.dateDebut || c.date || '',
+  dateFin: c.date_fin || c.dateFin || '',
   lieu: c.lieu || '',
+  adresse: c.adresse || '',
   heure: c.heure || '09:00',
   archive: c.archive || false,
   participants: allParticipants
@@ -85,7 +90,10 @@ export default function Dashboard() {
   const [addCongressOpen, setAddCongressOpen] = useState(false);
   const [newNom, setNewNom] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [newDateFin, setNewDateFin] = useState('');
   const [newLieu, setNewLieu] = useState('');
+  const [newAdresse, setNewAdresse] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [newHeure, setNewHeure] = useState('');
 
   // ── Modale logistique ──
@@ -154,12 +162,15 @@ export default function Dashboard() {
   // ─── Ajout d'un congrès ──────────────────────────────────────────────────────
   const handleAddCongres = () => {
     if (!newNom.trim()) return;
-    const id = `congres-${Date.now()}`;
+    const id = crypto.randomUUID();
     setCongres(prev => [...prev, {
       id,
       nom: newNom.trim(),
       date: newDate,
+      dateDebut: newDate,
+      dateFin: newDateFin,
       lieu: newLieu,
+      adresse: newAdresse,
       heure: newHeure,
       participants: [],
       archive: false
@@ -167,7 +178,9 @@ export default function Dashboard() {
     setSelectedId(id);
     setNewNom('');
     setNewDate('');
+    setNewDateFin('');
     setNewLieu('');
+    setNewAdresse('');
     setNewHeure('');
     setAddCongressOpen(false);
   };
@@ -252,7 +265,7 @@ export default function Dashboard() {
         const etablissement = String(row['Q'] || '').trim(); // Col Q
 
         return {
-          id: `${selectedId}-${Date.now()}-${index}`,
+          id: crypto.randomUUID(),
           nom: `${prenom} ${nom}`.trim() || 'Inconnu',
           email,
           telephone,
@@ -591,7 +604,10 @@ export default function Dashboard() {
         id: c.id,
         nom: c.nom,
         date: c.date,
+        date_debut: c.dateDebut || c.date,
+        date_fin: c.dateFin,
         lieu: c.lieu,
+        adresse: c.adresse,
         archive: c.archive || false
       }));
       if (congresPayload.length > 0) {
@@ -610,6 +626,8 @@ export default function Dashboard() {
           ville_depart: p.villeDepart,
           statut: p.statut,
           deja_exporte: p.dejaExporte || false,
+          date_debut: c.dateDebut || c.date,
+          date_fin: c.dateFin,
           proposition_transport: p.logistique?.transports || [],
           proposition_hotel: p.logistique?.hotels || []
         }))
@@ -926,7 +944,11 @@ export default function Dashboard() {
 
                         <div>
                           <h3 className="text-xl font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight leading-tight">{c.nom}</h3>
-                          <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">{c.date || "Date non spécifiée"}</p>
+                          <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                            {c.dateDebut ? (
+                              <>Du {c.dateDebut.split('-').reverse().join('/')} {c.dateFin && c.dateFin !== c.dateDebut ? ` au ${c.dateFin.split('-').reverse().join('/')}` : ''}</>
+                            ) : (c.date || "Date non spécifiée")}
+                          </p>
                         </div>
 
                         <div className="w-full flex justify-between items-center bg-[#F8F9FB] border border-gray-100 rounded-[20px] p-5 mt-auto">
@@ -1011,7 +1033,11 @@ export default function Dashboard() {
 
                         <div>
                           <h3 className="text-xl font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight leading-tight">{c.nom}</h3>
-                          <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">{c.date || "Date non spécifiée"}</p>
+                          <p className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                            {c.dateDebut ? (
+                              <>Du {c.dateDebut.split('-').reverse().join('/')} {c.dateFin && c.dateFin !== c.dateDebut ? ` au ${c.dateFin.split('-').reverse().join('/')}` : ''}</>
+                            ) : (c.date || "Date non spécifiée")}
+                          </p>
                         </div>
 
                         <div className="w-full flex justify-between items-center bg-[#F8F9FB] border border-gray-100 rounded-[20px] p-5 mt-auto">
@@ -1037,7 +1063,26 @@ export default function Dashboard() {
               <div className="flex justify-between items-end">
                 <div>
                   <h2 className={`text-3xl font-extrabold tracking-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{selectedCongres.nom}</h2>
-                  <p className="text-gray-400 mt-1 font-medium">{selectedCongres.date || "Événement planifié"}</p>
+                   <div className="text-gray-400 mt-2 font-bold flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      {selectedCongres.lieu && (
+                        <span className="text-blue-500 bg-blue-50 px-3 py-1 rounded-lg uppercase text-[10px] tracking-widest flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" /> {selectedCongres.lieu}
+                        </span>
+                      )}
+                      {selectedCongres.dateDebut ? (
+                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {selectedCongres.dateDebut.split('-').reverse().join('/')} {selectedCongres.dateFin && selectedCongres.dateFin !== selectedCongres.dateDebut ? ` au ${selectedCongres.dateFin.split('-').reverse().join('/')}` : ''}
+                        </span>
+                      ) : <span className="text-xs">{selectedCongres.date || "Événement planifié"}</span>}
+                    </div>
+                    {selectedCongres.adresse && (
+                      <p className="text-[11px] text-gray-400 font-medium flex items-center gap-2 italic ml-1">
+                        <MapPin className="w-3 h-3 text-red-400" /> {selectedCongres.adresse}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-2">
@@ -1193,21 +1238,27 @@ export default function Dashboard() {
                                       </div>
                                       <div className="flex-1 text-xs">
                                         <p className="font-bold text-gray-800">{p.logistique.transports[0].aller.lieuDepart || '?'} → {p.logistique.transports[0].aller.lieuArrivee || '?'}</p>
-                                        <p className="text-[10px] text-gray-500">{p.logistique.transports[0].aller.date && <>{p.logistique.transports[0].aller.date} • {p.logistique.transports[0].aller.depart} à {p.logistique.transports[0].aller.arrivee}</>}</p>
+                                        <p className="text-[10px] text-gray-500">
+                                          {p.logistique.transports[0].aller.date && <>{p.logistique.transports[0].aller.date} • </>}
+                                          {p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}
+                                        </p>
                                       </div>
                                     </div>
                                   ) : (
                                     <div className="text-xs text-gray-400 italic">Transport Aller non défini</div>
                                   )}
                                   {/* Retour */}
-                                  {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].retour && p.logistique.transports[0].retour.lieuDepart ? (
+                                  {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].retour ? (
                                     <div className="flex items-start gap-2">
                                       <div className="mt-0.5 text-orange-400">
                                         {p.logistique.transports[0].retour.type === 'TRAIN' ? <Train className="w-3.5 h-3.5" /> : <Plane className="w-3.5 h-3.5" />}
                                       </div>
                                       <div className="flex-1 text-xs">
-                                        <p className="font-bold text-gray-800">{p.logistique.transports[0].retour.lieuDepart} → {p.logistique.transports[0].retour.lieuArrivee}</p>
-                                        <p className="text-[10px] text-gray-500">{p.logistique.transports[0].retour.date && <>{p.logistique.transports[0].retour.date} • {p.logistique.transports[0].retour.depart} à {p.logistique.transports[0].retour.arrivee}</>}</p>
+                                        <p className="font-bold text-gray-800">{p.logistique.transports[0].retour.lieuDepart || '?'} → {p.logistique.transports[0].retour.lieuArrivee || '?'}</p>
+                                        <p className="text-[10px] text-gray-500">
+                                          {p.logistique.transports[0].retour.date && <>{p.logistique.transports[0].retour.date} • </>}
+                                          {p.logistique.transports[0].retour.depart || '--:--'} à {p.logistique.transports[0].retour.arrivee || '--:--'}
+                                        </p>
                                       </div>
                                     </div>
                                   ) : null}
@@ -1353,25 +1404,72 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Date</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Date de début</label>
                   <input
-                    type="text"
-                    placeholder="ex: 12-14 Juin"
+                    type="date"
                     className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
                     value={newDate}
                     onChange={e => setNewDate(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Lieu / Ville</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Date de fin</label>
                   <input
-                    type="text"
-                    placeholder="ex: Paris, Palais des Congrès"
+                    type="date"
                     className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
-                    value={newLieu}
-                    onChange={e => setNewLieu(e.target.value)}
+                    value={newDateFin}
+                    onChange={e => setNewDateFin(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Lieu / Ville</label>
+                <input
+                  type="text"
+                  placeholder="ex: Paris, Palais des Congrès"
+                  className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                  value={newLieu}
+                  onChange={e => setNewLieu(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2 relative">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Adresse précise (avec Auto-complétion)</label>
+                <input
+                  id="event-address-input"
+                  type="text"
+                  placeholder="ex: 2 Place de la Porte Maillot, 75017 Paris"
+                  className="w-full bg-blue-50/50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                  value={newAdresse}
+                  onChange={async (e) => {
+                    setNewAdresse(e.target.value);
+                    if (e.target.value.length > 3) {
+                      const res = await fetchAddressSuggestions(e.target.value);
+                      setAddressSuggestions(res);
+                    } else {
+                      setAddressSuggestions([]);
+                    }
+                  }}
+                />
+                {addressSuggestions.length > 0 && (
+                  <div className="absolute top-[100%] left-0 right-0 z-[100] mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
+                    {addressSuggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setNewAdresse(s.label);
+                          setAddressSuggestions([]);
+                        }}
+                        className="w-full text-left px-5 py-3 hover:bg-blue-50 text-xs font-bold text-gray-700 transition-all flex flex-col"
+                      >
+                        <span>{s.label}</span>
+                        <span className="text-[8px] uppercase tracking-widest text-gray-400 font-medium">{s.postcode} {s.city}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1459,14 +1557,17 @@ export default function Dashboard() {
                     <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center not-italic">✈️</span>
                     Plan de Voyage
                   </h4>
-                  {transports.length < 3 && (
-                    <button
-                      onClick={() => setTransports(t => [...t, propositionVide()])}
-                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all border border-blue-100"
-                    >
-                      Ajouter une Option
-                    </button>
-                  )}
+
+                  <div className="flex gap-3">
+                    {transports.length < 3 && (
+                      <button
+                        onClick={() => setTransports(t => [...t, propositionVide()])}
+                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all border border-blue-100"
+                      >
+                        + Ajouter une Option
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-6">
@@ -1487,140 +1588,105 @@ export default function Dashboard() {
                       </div>
 
                       {/* Aller */}
-                      <div className="space-y-6 pt-4">
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> Aller (vers le congrès)
-                        </p>
+                      <div className="space-y-4 pt-4">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> Aller (vers le congrès)
+                          </p>
+                          <div className="flex gap-2 mr-24">
+                            <button
+                              onClick={() => selectedCongres && openGoogleFlights(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date)}
+                              className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Plane className="w-2.5 h-2.5" /> Vols
+                            </button>
+                            <button
+                              onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date)}
+                              className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Train className="w-2.5 h-2.5" /> Train
+                            </button>
+                          </div>
+                        </div>
 
-                        <div className="grid grid-cols-1 gap-6">
-                          {/* 1. Lieu de départ */}
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Ville / Lieu de départ</label>
-                            <input type="text" placeholder="Gare / Aéroport de départ" className="w-full bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
+                        <div className="grid grid-cols-1 gap-2">
+                          <input type="text" placeholder="Départ (Gare / Aéroport)" className="w-full bg-white border border-blue-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
+                          
+                          <div className="relative px-6">
+                            <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-blue-100"></div>
+                            <div className="flex gap-2 items-center bg-blue-50/50 p-2 rounded-xl">
+                              <span className="text-[9px] font-black text-blue-300 uppercase shrink-0">Escale</span>
+                              <input type="text" placeholder="Ville d'escale (optionnel)" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
+                              <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-20" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
+                            </div>
                           </div>
 
-                          {/* 2. Détails Voyage */}
-                          <div className="flex gap-4">
-                            <div className="flex-[0.5]">
-                              <div className="flex gap-2">
-                                <select className="bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
-                                  <option value="TRAIN">🚆 Train</option>
-                                  <option value="FLIGHT">✈️ Avion</option>
-                                </select>
-                                <input type="text" placeholder="N° / Vol" className="flex-1 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
-                              </div>
-                            </div>
-                            <input type="date" className="w-[180px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.aller.date} onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} />
-                            <div className="flex gap-2">
-                              <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
-                              <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.aller.arrivee} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
-                            </div>
-                          </div>
+                          <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-blue-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
+                        </div>
 
-                          {/* 3. Correspondance */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center px-4">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Correspondance / Escale</label>
-                              <button
-                                onClick={() => {
-                                  const isAdd = prop.aller.correspondanceLieu === undefined;
-                                  updateTransportMulti(idx, 'aller', {
-                                    correspondanceLieu: isAdd ? '' : undefined,
-                                    correspondanceDate: isAdd ? prop.aller.date : undefined,
-                                    correspondanceHeure: isAdd ? '' : undefined,
-                                    correspondanceNumero: isAdd ? '' : undefined
-                                  });
-                                }}
-                                className="text-[10px] font-bold text-blue-600 hover:underline"
-                              >
-                                {prop.aller.correspondanceLieu === undefined ? "+ Ajouter escale" : "Supprimer escale"}
-                              </button>
-                            </div>
-                            {prop.aller.correspondanceLieu !== undefined ? (
-                              <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2">
-                                <input type="text" placeholder="Lieu (ex: Lyon)" className="flex-1 min-w-[120px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.correspondanceLieu} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
-                                <input type="text" placeholder="N° Vol/Train" className="flex-1 min-w-[100px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
-                                <input type="date" className="w-[140px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.aller.correspondanceDate} onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} />
-                                <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.aller.correspondanceHeure} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
-                              </div>
-                            ) : (
-                              <div className="w-full bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-4 text-center text-xs text-gray-400 font-medium h-[52px] flex items-center justify-center">Direct</div>
-                            )}
-                          </div>
-
-                          {/* 4. Lieu d'arrivée */}
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Lieu d'arrivée</label>
-                            <input type="text" placeholder="Gare / Aéroport de destination" className="w-full bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
+                        <div className="flex gap-2 p-2 bg-gray-50 rounded-xl items-center">
+                          <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
+                            <option value="TRAIN">🚆</option>
+                            <option value="FLIGHT">✈️</option>
+                          </select>
+                          <input type="text" placeholder="Train/Vol n°" className="w-24 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
+                          <input type="date" className="flex-1 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.date} onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} />
+                          <div className="flex items-center gap-1 px-2 border-l border-gray-200">
+                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
+                             <span className="text-gray-300">→</span>
+                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.aller.arrivee} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
                           </div>
                         </div>
                       </div>
 
                       {/* Retour */}
-                      <div className="space-y-6 pt-8 mt-8 border-t border-blue-100">
-                        <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" /> Retour (vers domicile)
-                        </p>
-                        <div className="grid grid-cols-1 gap-6">
-                          {/* 1. Lieu de départ */}
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Ville / Lieu de départ</label>
-                            <input type="text" placeholder="Gare / Aéroport de départ" className="w-full bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
+                      <div className="space-y-4 pt-6 mt-6 border-t border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" /> Retour (vers domicile)
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date)}
+                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Plane className="w-2.5 h-2.5" /> Vols
+                            </button>
+                            <button
+                              onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date)}
+                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Train className="w-2.5 h-2.5" /> Train
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2">
+                          <input type="text" placeholder="Départ (Gare / Aéroport)" className="w-full bg-white border border-orange-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
+                          
+                          <div className="relative px-6">
+                            <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-orange-100"></div>
+                            <div className="flex gap-2 items-center bg-orange-50/50 p-2 rounded-xl">
+                              <span className="text-[9px] font-black text-orange-300 uppercase tracking-widest shrink-0">Escale</span>
+                              <input type="text" placeholder="Ville d'escale (optionnel)" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
+                              <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-20" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
+                            </div>
                           </div>
 
-                          {/* 2. Détails Voyage */}
-                          <div className="flex gap-4">
-                            <div className="flex-[0.5]">
-                              <div className="flex gap-2">
-                                <select className="bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
-                                  <option value="TRAIN">🚆 Train</option>
-                                  <option value="FLIGHT">✈️ Avion</option>
-                                </select>
-                                <input type="text" placeholder="N° / Vol" className="flex-1 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
-                              </div>
-                            </div>
-                            <input type="date" className="w-[180px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.retour.date} onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} />
-                            <div className="flex gap-2">
-                              <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
-                              <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.retour.arrivee} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
-                            </div>
-                          </div>
+                          <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-orange-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
+                        </div>
 
-                          {/* 3. Correspondance */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center px-4">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Correspondance / Escale</label>
-                              <button
-                                onClick={() => {
-                                  const isAdd = prop.retour.correspondanceLieu === undefined;
-                                  updateTransportMulti(idx, 'retour', {
-                                    correspondanceLieu: isAdd ? '' : undefined,
-                                    correspondanceDate: isAdd ? prop.retour.date : undefined,
-                                    correspondanceHeure: isAdd ? '' : undefined,
-                                    correspondanceNumero: isAdd ? '' : undefined
-                                  });
-                                }}
-                                className="text-[10px] font-bold text-orange-600 hover:underline"
-                              >
-                                {prop.retour.correspondanceLieu === undefined ? "+ Ajouter escale" : "Supprimer escale"}
-                              </button>
-                            </div>
-                            {prop.retour.correspondanceLieu !== undefined ? (
-                              <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2">
-                                <input type="text" placeholder="Lieu (ex: Paris)" className="flex-1 min-w-[120px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-orange-100" value={prop.retour.correspondanceLieu} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
-                                <input type="text" placeholder="N° Vol/Train" className="flex-1 min-w-[100px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-orange-100" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
-                                <input type="date" className="w-[140px] bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.retour.correspondanceDate} onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} />
-                                <input type="time" className="w-24 bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm" value={prop.retour.correspondanceHeure} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
-                              </div>
-                            ) : (
-                              <div className="w-full bg-orange-50/30 border border-dashed border-orange-200 rounded-2xl p-4 text-center text-xs text-orange-400 font-medium h-[52px] flex items-center justify-center">Direct</div>
-                            )}
-                          </div>
-
-                          {/* 4. Lieu d'arrivée */}
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Lieu d'arrivée</label>
-                            <input type="text" placeholder="Gare / Aéroport de destination" className="w-full bg-white border-none rounded-2xl p-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
+                        <div className="flex gap-2 p-2 bg-gray-50 rounded-xl items-center">
+                          <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
+                            <option value="TRAIN">🚆</option>
+                            <option value="FLIGHT">✈️</option>
+                          </select>
+                          <input type="text" placeholder="Train/Vol n°" className="w-24 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
+                          <input type="date" className="flex-1 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.date} onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} />
+                          <div className="flex items-center gap-1 px-2 border-l border-gray-200">
+                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
+                             <span className="text-gray-300">→</span>
+                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.retour.arrivee} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
                           </div>
                         </div>
                       </div>
@@ -1636,6 +1702,19 @@ export default function Dashboard() {
                     <span className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center not-italic">🏨</span>
                     Hébergement
                   </h4>
+                  {selectedCongres && (
+                    <button
+                      onClick={() => openGoogleHotels(
+                        selectedCongres.lieu || selectedCongres.nom,
+                        selectedCongres.dateDebut || selectedCongres.date,
+                        selectedCongres.dateFin
+                      )}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                      title="Filtres auto : 3-4*, max 150€ TTC, petit-déjeuner inclus"
+                    >
+                      🏨 Rechercher (3-4*, max 150€)
+                    </button>
+                  )}
                   {hotels.length < 3 && (
                     <button onClick={() => setHotels(h => [...h, { nom: '' }])} className="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all">
                       Ajouter un hôtel

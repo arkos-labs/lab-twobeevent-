@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Twobeevent Capture",
+  "version": "1.0",
+  "description": "Capture les données d'hôtels et de transports pour Twobeevent.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "*://*.sncf-connect.com/*",
+    "*://*.google.com/travel/*",
+    "*://*.booking.com/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.sncf-connect.com/*",
+        "*://*.google.com/travel/*",
+        "*://*.booking.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}

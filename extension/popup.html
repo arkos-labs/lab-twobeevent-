@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Twobeevent Capture</title>
+    <style>
+      body {
+        width: 320px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        padding: 15px;
+        background-color: #f8fafc;
+        border-radius: 12px;
+      }
+      h1 { font-size: 16px; margin: 0 0 10px; color: #1e293b; font-weight: 600; }
+      .card {
+        background: white; border: 1px solid #e2e8f0;
+        padding: 12px; border-radius: 8px; margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .label { font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+      .value { font-size: 14px; font-weight: 500; color: #334155; }
+      .btn {
+        width: 100%; padding: 10px; border: none; border-radius: 6px;
+        background-color: #2563eb; color: white; cursor: pointer;
+        font-weight: 500; transition: background 0.2s;
+      }
+      .btn:hover { background-color: #1d4ed8; }
+      .btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+      #status { font-size: 12px; color: #16a34a; margin-top: 8px; font-weight: 500; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Twobeevent Capture</h1>
+    
+    <div id="dataCard" class="card">
+      <div id="hotelSection">
+        <div class="label">Hôtel Détecté</div>
+        <div id="hotelName" class="value">Aucun</div>
+      </div>
+      <div id="transportSection" style="margin-top: 10px;">
+        <div class="label">Transport Détecté</div>
+        <div id="transportInfo" class="value">Aucun</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Participant ID</div>
+      <input type="text" id="participantId" placeholder="Copiez l'ID du participant" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 4px;">
+    </div>
+
+    <button id="sendBtn" class="btn" disabled>Envoyer vers Twobeevent</button>
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
