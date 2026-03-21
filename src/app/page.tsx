@@ -1303,6 +1303,12 @@ export default function Dashboard() {
                                           {p.logistique.transports[0].aller.date && <>{p.logistique.transports[0].aller.date} • </>}
                                           {p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}
                                         </p>
+                                        {p.logistique.transports[0].aller.correspondanceLieu && (
+                                          <p className="text-[10px] text-blue-500">
+                                            Correspondance: {p.logistique.transports[0].aller.correspondanceLieu}
+                                            {p.logistique.transports[0].aller.correspondanceHeure ? ` (${p.logistique.transports[0].aller.correspondanceHeure})` : ''}
+                                          </p>
+                                        )}
                                       </div>
                                     </div>
                                   ) : (
@@ -1320,6 +1326,12 @@ export default function Dashboard() {
                                           {p.logistique.transports[0].retour.date && <>{p.logistique.transports[0].retour.date} • </>}
                                           {p.logistique.transports[0].retour.depart || '--:--'} à {p.logistique.transports[0].retour.arrivee || '--:--'}
                                         </p>
+                                        {p.logistique.transports[0].retour.correspondanceLieu && (
+                                          <p className="text-[10px] text-orange-500">
+                                            Correspondance: {p.logistique.transports[0].retour.correspondanceLieu}
+                                            {p.logistique.transports[0].retour.correspondanceHeure ? ` (${p.logistique.transports[0].retour.correspondanceHeure})` : ''}
+                                          </p>
+                                        )}
                                       </div>
                                     </div>
                                   ) : null}

@@ -90,6 +90,7 @@ export async function POST(req: Request) {
                     trajet.correspondanceLieu = escale?.lieuArrivee || '';
                     trajet.correspondanceHeure = escale?.arrivee || '';
                     trajet.correspondanceNumero = next?.numero || '';
+                    trajet.correspondanceDate = trajet.date || '';
                 }
                 return trajet;
             };
