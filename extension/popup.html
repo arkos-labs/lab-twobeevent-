@@ -1,11 +1,7 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Twobeevent Capture</title>
     <style>
       body {
-        width: 320px;
+        width: 350px;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         padding: 15px;
         background-color: #f8fafc;
@@ -17,16 +13,27 @@
         padding: 12px; border-radius: 8px; margin-bottom: 12px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
       }
-      .label { font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
-      .value { font-size: 14px; font-weight: 500; color: #334155; }
+      .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; font-weight: bold; }
+      .value { font-size: 13px; font-weight: 500; color: #334155; }
       .btn {
-        width: 100%; padding: 10px; border: none; border-radius: 6px;
+        width: 100%; padding: 12px; border: none; border-radius: 8px;
         background-color: #2563eb; color: white; cursor: pointer;
-        font-weight: 500; transition: background 0.2s;
+        font-weight: 600; transition: background 0.2s;
+        font-size: 14px;
       }
       .btn:hover { background-color: #1d4ed8; }
       .btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
-      #status { font-size: 12px; color: #16a34a; margin-top: 8px; font-weight: 500; text-align: center; }
+      #status { font-size: 12px; color: #16a34a; margin-top: 8px; font-weight: 500; text-align: center; min-height: 18px; }
+      
+      .segment-input {
+        display: flex; gap: 5px; margin-bottom: 8px; align-items: center;
+      }
+      .segment-input input {
+        border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 8px; font-size: 12px; width: 100%;
+      }
+      .segment-input input.time { width: 60px; text-align: center; font-weight: bold; }
+      .segment-input input.train { width: 80px; font-size: 10px; color: #64748b; }
+      .section-title { font-size: 11px; font-weight: 800; color: #2563eb; margin: 10px 0 5px; text-transform: uppercase; letter-spacing: 0.05em; }
     </style>
   </head>
   <body>
@@ -37,15 +44,19 @@
         <div class="label">Hôtel Détecté</div>
         <div id="hotelName" class="value">Aucun</div>
       </div>
-      <div id="transportSection" style="margin-top: 10px;">
-        <div class="label">Transport Détecté</div>
-        <div id="transportInfo" class="value">Aucun</div>
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 12px 0;">
+      
+      <div id="transportSection">
+        <div class="label">Plan de Transport (Aller & Retour)</div>
+        <div id="segmentsContainer">
+           <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 10px 0;">Aucun transport détecté.<br>Ouvrez un détail de trajet sur SNCF Connect.</p>
+        </div>
       </div>
     </div>
 
     <div class="card">
       <div class="label">Participant ID</div>
-      <input type="text" id="participantId" placeholder="Copiez l'ID du participant" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 4px;">
+      <input type="text" id="participantId" placeholder="Copiez l'ID du participant" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: bold; color: #2563eb;">
     </div>
 
     <button id="sendBtn" class="btn" disabled>Envoyer vers Twobeevent</button>

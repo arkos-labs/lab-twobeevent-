@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const hotelNameEl = document.getElementById('hotelName');
-    const transportInfoEl = document.getElementById('transportInfo');
+    const segmentsContainer = document.getElementById('segmentsContainer');
     const sendBtn = document.getElementById('sendBtn');
     const statusEl = document.getElementById('status');
     const participantIdInput = document.getElementById('participantId');
@@ -34,45 +34,86 @@ document.addEventListener('DOMContentLoaded', async () => {
                     chrome.storage.local.set({ 'twobeevent_pid': response.participantId });
                 }
 
-                // Sauvegarder
                 chrome.storage.local.set({ 
                     'twobeevent_transport': transportData,
                     'twobeevent_hotel': hotelData
                 });
-                
                 updateUI();
             }
         });
     });
+
+    function createSegmentRow(segment, section, index) {
+        const row = document.createElement('div');
+        row.className = 'segment-input';
+        
+        const timeInput = document.createElement('input');
+        timeInput.type = 'text';
+        timeInput.className = 'time';
+        timeInput.value = segment.depart || "";
+        timeInput.addEventListener('input', (e) => {
+            transportData[section].segments[index].depart = e.target.value;
+            saveData();
+        });
+
+        const garesInput = document.createElement('input');
+        garesInput.type = 'text';
+        garesInput.value = `${segment.lieuDepart} → ${segment.lieuArrivee}`;
+        garesInput.addEventListener('input', (e) => {
+            const parts = e.target.value.split('→').map(p => p.trim());
+            transportData[section].segments[index].lieuDepart = parts[0] || "";
+            transportData[section].segments[index].lieuArrivee = parts[1] || "";
+            saveData();
+        });
+
+        const trainInput = document.createElement('input');
+        trainInput.type = 'text';
+        trainInput.className = 'train';
+        trainInput.placeholder = 'N° Train';
+        trainInput.value = segment.numero || "";
+        trainInput.addEventListener('input', (e) => {
+            transportData[section].segments[index].numero = e.target.value;
+            saveData();
+        });
+
+        row.appendChild(timeInput);
+        row.appendChild(garesInput);
+        row.appendChild(trainInput);
+        return row;
+    }
 
     function updateUI() {
         if (hotelData) {
             hotelNameEl.innerText = hotelData.name || "Hôtel détecté";
         }
 
-        let transportSummary = "";
-        if (transportData.aller) {
-            const a = transportData.aller;
-            transportSummary += `🔵 ALLER (${a.date || ''})\n`;
-            transportSummary += `${a.depart} **${a.departureTime}** ${a.numero ? `(N°${a.numero})` : ''} → ${a.correspondanceLieu || a.arrivee} **${a.correspondanceArrivee || a.arrivalTime}**\n`;
-            if (a.correspondanceLieu) {
-                transportSummary += `${a.correspondanceLieu} **${a.correspondanceHeure}** ${a.correspondanceNumero ? `(N°${a.correspondanceNumero})` : ''} → ${a.arrivee} **${a.arrivalTime}**\n`;
-            }
-        }
+        segmentsContainer.innerHTML = "";
+        
+        const renderSection = (title, data, key) => {
+            if (!data || !data.segments || data.segments.length === 0) return;
+            
+            const titleEl = document.createElement('div');
+            titleEl.className = 'section-title';
+            titleEl.innerText = title;
+            segmentsContainer.appendChild(titleEl);
+            
+            data.segments.forEach((seg, idx) => {
+                segmentsContainer.appendChild(createSegmentRow(seg, key, idx));
+            });
+        };
 
-        if (transportData.retour) {
-            const r = transportData.retour;
-            transportSummary += `\n🟠 RETOUR (${r.date || ''})\n`;
-            transportSummary += `${r.depart} **${r.departureTime}** ${r.numero ? `(N°${r.numero})` : ''} → ${r.correspondanceLieu || r.arrivee} **${r.correspondanceArrivee || r.arrivalTime}**\n`;
-            if (r.correspondanceLieu) {
-                transportSummary += `${r.correspondanceLieu} **${r.correspondanceHeure}** ${r.correspondanceNumero ? `(N°${r.correspondanceNumero})` : ''} → ${r.arrivee} **${r.arrivalTime}**\n`;
-            }
-        }
+        renderSection('🔵 Aller', transportData.aller, 'aller');
+        renderSection('🟠 Retour', transportData.retour, 'retour');
 
-        transportInfoEl.innerHTML = transportSummary.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        transportInfoEl.style.fontSize = '10px';
+        if (segmentsContainer.innerHTML === "") {
+            segmentsContainer.innerHTML = '<p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 10px 0;">Aucun transport détecté.<br>Ouvrez un détail de trajet sur SNCF Connect.</p>';
+        }
 
         sendBtn.disabled = !(hotelData || transportData.aller || transportData.retour) || !participantIdInput.value.trim();
+    }
+
+    function saveData() {
+        chrome.storage.local.set({ 'twobeevent_transport': transportData });
     }
 
     // Envoyer vers Twobeevent
@@ -85,6 +126,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusEl.style.color = "#2563eb";
 
         try {
+            // S'assurer que les champs globaux sont à jour s'il y a des segments
+            const prepareData = (data) => {
+                if (!data || !data.segments || data.segments.length === 0) return data;
+                const first = data.segments[0];
+                const last = data.segments[data.segments.length - 1];
+                return {
+                    ...data,
+                    depart: first.depart,
+                    lieuDepart: first.lieuDepart,
+                    arrivee: last.arrivee,
+                    lieuArrivee: last.lieuArrivee,
+                    numero: first.numero,
+                    segments: data.segments
+                };
+            };
+
             const response = await fetch('http://localhost:3000/api/logistique/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -92,20 +149,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     participantId: pId,
                     hotel: hotelData,
                     transport: {
-                        aller: transportData.aller,
-                        retour: transportData.retour,
+                        aller: prepareData(transportData.aller),
+                        retour: prepareData(transportData.retour),
                         segmentsAller: transportData.aller?.segments || [],
                         segmentsRetour: transportData.retour?.segments || []
                     }
-
                 })
             });
 
             if (response.ok) {
                 statusEl.innerText = "Succès ! Données enregistrées.";
                 statusEl.style.color = "#16a34a";
-                // Optionnel: Vider le storage après succès
-                // chrome.storage.local.remove(['twobeevent_transport', 'twobeevent_hotel']);
             } else {
                 throw new Error("Erreur serveur.");
             }
@@ -118,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     participantIdInput.addEventListener('input', () => {
         chrome.storage.local.set({ 'twobeevent_pid': participantIdInput.value });
-        updateUI();
+        sendBtn.disabled = !participantIdInput.value.trim();
     });
 });
 
