@@ -38,13 +38,11 @@ function extractAllDetails() {
     data.transport = { aller: allerTrajet, retour: retourTrajet, site: "SNCF Connect", type: "TRAIN" };
   }
 
-  // --- LOGIQUE GOOGLE FLIGHTS (BÉTON) ---
+  // --- LOGIQUE GOOGLE FLIGHTS ---
   if (url.includes("google.com/travel/flights")) {
     console.log("[Twobeevent] Page Google Flights détectée.");
     const fullText = document.body.innerText;
     
-    // 1. Extraire TOUTES les paires (Horaire, Code Aeroport)
-    // On cherche les lignes : "19:00 · Aéroport de Paris... (CDG)"
     const flightLegs = [];
     const legRegex = /(\d{1,2}:\d{2})\s*·\s*[^()]+\((([A-Z]{3}))\)/g;
     let match;
@@ -52,15 +50,18 @@ function extractAllDetails() {
       flightLegs.push({ time: match[1], iata: match[2] });
     }
 
-    // 2. Extraire les numéros de vol AF 1234
     const flightNumRegex = /\b([A-Z]{2}\d{3,5}|[A-Z]{2}\s\d{3,5})\b/g;
     const flightNums = (fullText.match(flightNumRegex) || [])
       .map(f => f.replace(/\s/g, ''))
       .filter(f => !['CO2','TTC','USD','EUR','JPY'].includes(f));
 
-    // 3. Identifier si c'est un retour
-    const isRetour = /retour\s*[·.]\s*\w+/i.test(fullText.substring(0, 500));
-    const extractedDate = (fullText.match(/(?:aller|retour)\s*[·.]\s*((?:\w+\.?\s+)?\d+\s+\w+)/i) || [])[1] || "";
+    // Détection Retour BEAUCOUP plus permissive
+    const firstLines = fullText.substring(0, 1000).toLowerCase();
+    const isRetour = firstLines.includes("retour") || firstLines.includes("inbound") || url.includes("inbound");
+    
+    const dateMatch = (fullText.match(/(?:aller|retour)\s*[·.]\s*((?:\w+\.?\s+)?\d+\s+\w+)/i) || 
+                      fullText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+(\d+\s+\w+)/i) || 
+                      [])[1] || "";
 
     if (flightLegs.length >= 2) {
       const trajet = {
@@ -70,7 +71,7 @@ function extractAllDetails() {
         depart: flightLegs[0].time,
         arrivee: flightLegs[flightLegs.length - 1].time,
         numero: flightNums[0] || "",
-        date: extractedDate,
+        date: dateMatch.trim(),
         correspondanceLieu: flightLegs.length > 2 ? `Escale à ${flightLegs.slice(1, -1).map(l => l.iata).join(', ')}` : ""
       };
 
