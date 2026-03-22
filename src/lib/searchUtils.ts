@@ -29,7 +29,7 @@ export function openGoogleFlights(
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noreferrer');
 }
 
 // Ouvre Google Hotels pré-rempli avec les filtres demandés (3-4*, max 150€, petit-déjeuner inclus)
@@ -64,7 +64,7 @@ export function openGoogleHotels(
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noreferrer');
 }
 
 // Ouvre SNCF Connect pré-rempli (trains)
@@ -93,5 +93,42 @@ export function openSNCF(origin: string, destination: string, date: string, date
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noreferrer');
+}
+
+// Ouvre Trainline pré-rempli (alternative à SNCF Connect)
+export function openTrainline(
+  origin: string, 
+  destination: string, 
+  date: string, 
+  dateRetour?: string, 
+  heureDebut?: string, 
+  congresId?: string, 
+  participantId?: string
+) {
+  const cleanCity = (str: string) =>
+    str.replace(/\(.*?\)/g, '').trim().split(' ')[0];
+  const from = cleanCity(origin);
+  const to = cleanCity(destination);
+  
+  // Format Trainline: https://www.thetrainline.com/search/results?departureStation=paris&arrivalStation=lyon&outwardDate=2024-03-23T08%3A00%3A00
+  const formatDate = (d: string) => {
+    if (!d) return '';
+    return d; // YYYY-MM-DD
+  };
+
+  const d = formatDate(date);
+  const time = heureDebut ? `${heureDebut}:00` : "08:00:00";
+  
+  let url = `https://www.thetrainline.com/search/results?departureStation=${encodeURIComponent(from)}&arrivalStation=${encodeURIComponent(to)}&outwardDate=${d}T${encodeURIComponent(time)}`;
+  
+  if (dateRetour) {
+    url += `&inwardDate=${formatDate(dateRetour)}T17%3A00%3A00`;
+  }
+  
+  if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
+  if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
+  url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
+
+  window.open(url, '_blank', 'noreferrer');
 }

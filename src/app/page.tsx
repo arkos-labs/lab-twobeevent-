@@ -9,7 +9,7 @@ import {
   Moon, Sun, Wand2, Zap
 } from 'lucide-react';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
-import { openGoogleFlights, openGoogleHotels, openSNCF } from '@/lib/searchUtils';
+import { openGoogleFlights, openGoogleHotels, openSNCF, openTrainline } from '@/lib/searchUtils';
 import { fetchAddressSuggestions } from '@/lib/autocomplete';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +29,11 @@ const trajetVide = (): Trajet => ({
   correspondanceHeure: '',
   correspondanceArrivee: '',
   correspondanceDate: '',
-  correspondanceNumero: ''
+  correspondanceNumero: '',
+  duree: '',
+  classe: '',
+  placement: '',
+  correspondanceDuree: ''
 });
 
 
@@ -1293,114 +1297,135 @@ export default function Dashboard() {
                                   + SAISIR OPTIONS
                                 </button>
                               ) : (
-                                <div className="space-y-3 max-w-[280px]">
-                                  {/* Aller */}
-                                  {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].aller ? (
-                                    <div className="flex items-start gap-2">
-                                      <div className="mt-1 text-blue-500">
-                                        {p.logistique.transports[0].aller.type === 'TRAIN' ? <Train className="w-4 h-4" /> : <Plane className="w-4 h-4" />}
-                                      </div>
-                                      <div className="flex-1 text-xs">
-                                        <div className="space-y-0.5">
-                                          <p className="font-bold text-gray-900 leading-tight">
-                                            {p.logistique.transports[0].aller.lieuDepart || '?'} → {p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee || '?'}
-                                          </p>
-                                          
-                                          {p.logistique.transports[0].aller.correspondanceLieu && (
-                                            <>
-                                              <div className="ml-1.5 py-1 border-l-2 border-dashed border-blue-100 pl-3 my-0.5">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-[9px] font-black text-blue-500 uppercase bg-blue-50 px-1.5 py-0.5 rounded">Escale: {p.logistique.transports[0].aller.correspondanceLieu}</span>
-                                                  <span className="text-[9px] text-gray-400 font-medium">{p.logistique.transports[0].aller.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].aller.correspondanceHeure || '--:--'}</span>
-                                                </div>
-                                                {p.logistique.transports[0].aller.correspondanceNumero && (
-                                                  <p className="text-[8px] text-gray-400 mt-0.5 italic">Changement pour n° {p.logistique.transports[0].aller.correspondanceNumero}</p>
-                                                )}
+                                <div className="space-y-4 max-w-[280px]">
+                                  {p.logistique.transports?.[0] && (
+                                    <>
+                                      {/* Aller */}
+                                      {p.logistique.transports[0].aller && (
+                                        <div className="space-y-4">
+                                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-tighter text-blue-500/80">
+                                            <span>Aller — {p.logistique.transports[0].aller.date || 'Date non précisée'}</span>
+                                            <span>{p.logistique.transports[0].aller.lieuDepart} → {p.logistique.transports[0].aller.lieuArrivee}</span>
+                                          </div>
+
+                                          <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-blue-100 dark:before:bg-blue-900/40">
+                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                              <div className="flex justify-between items-start mb-2">
+                                                <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-lg shadow-sm">{p.logistique.transports[0].aller.numero || 'TRAIN'}</span>
+                                                <span className="text-[10px] font-bold text-gray-400">{p.logistique.transports[0].aller.duree || ''}</span>
                                               </div>
-                                              <p className="font-bold text-gray-900 leading-tight">
-                                                {p.logistique.transports[0].aller.correspondanceLieu} → {p.logistique.transports[0].aller.lieuArrivee || '?'}
-                                              </p>
-                                            </>
-                                          )}
+                                              <div className="flex items-center gap-3 text-lg font-black text-gray-900 dark:text-gray-100">
+                                                 <span>{p.logistique.transports[0].aller.depart}</span>
+                                                 <ChevronRight className="w-4 h-4 text-gray-300" />
+                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu ? p.logistique.transports[0].aller.correspondanceArrivee : p.logistique.transports[0].aller.arrivee}</span>
+                                              </div>
+                                              <div className="text-[11px] text-gray-500 mt-1">
+                                                {p.logistique.transports[0].aller.lieuDepart} → {p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee}
+                                              </div>
+                                            </div>
+
+                                            {p.logistique.transports[0].aller.correspondanceLieu && (
+                                              <div className="flex items-center gap-2 pl-12 text-[10px] font-bold text-gray-400 italic">
+                                                <div className="w-4 h-px bg-gray-200" />
+                                                <span>⇄ Correspondance à {p.logistique.transports[0].aller.correspondanceLieu} · {p.logistique.transports[0].aller.correspondanceDuree || ''}</span>
+                                              </div>
+                                            )}
+
+                                            {p.logistique.transports[0].aller.correspondanceLieu && (
+                                              <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                <div className="flex justify-between items-start mb-2">
+                                                  <span className="px-2 py-0.5 bg-blue-400 text-white text-[9px] font-black rounded-lg shadow-sm">{p.logistique.transports[0].aller.correspondanceNumero || 'TRAIN 2'}</span>
+                                                  <span className="text-[10px] font-bold text-gray-400"></span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-lg font-black text-gray-900 dark:text-gray-100">
+                                                   <span>{p.logistique.transports[0].aller.correspondanceHeure}</span>
+                                                   <ChevronRight className="w-4 h-4 text-gray-300" />
+                                                   <span>{p.logistique.transports[0].aller.arrivee}</span>
+                                                </div>
+                                                <div className="text-[11px] text-gray-500 mt-1">
+                                                  {p.logistique.transports[0].aller.correspondanceLieu} → {p.logistique.transports[0].aller.lieuArrivee}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
-                                        
-                                        <div className="flex items-center gap-2 mt-1.5 opacity-60">
-                                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{p.logistique.transports[0].aller.date || '---'}</span>
-                                           <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                                           <span className="text-[9px] font-bold text-blue-600">{p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}</span>
-                                           <span className="text-[8px] text-gray-400">({p.logistique.transports[0].aller.numero})</span>
+                                      )}
+
+                                      {/* Retour */}
+                                      {p.logistique.transports[0].retour && (
+                                        <div className="space-y-4 mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
+                                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-tighter text-orange-500/80">
+                                            <span>Retour — {p.logistique.transports[0].retour.date || 'Date non précisée'}</span>
+                                            <span>{p.logistique.transports[0].retour.lieuDepart} → {p.logistique.transports[0].retour.lieuArrivee}</span>
+                                          </div>
+
+                                          <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-orange-100 dark:before:bg-orange-900/40">
+                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                              <div className="flex justify-between items-start mb-2">
+                                                <span className="px-2 py-0.5 bg-orange-600 text-white text-[9px] font-black rounded-lg shadow-sm">{p.logistique.transports[0].retour.numero || 'TRAIN'}</span>
+                                                <span className="text-[10px] font-bold text-gray-400">{p.logistique.transports[0].retour.duree || ''}</span>
+                                              </div>
+                                              <div className="flex items-center gap-3 text-lg font-black text-gray-900 dark:text-gray-100">
+                                                 <span>{p.logistique.transports[0].retour.depart}</span>
+                                                 <ChevronRight className="w-4 h-4 text-gray-300" />
+                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu ? p.logistique.transports[0].retour.correspondanceArrivee : p.logistique.transports[0].retour.arrivee}</span>
+                                              </div>
+                                              <div className="text-[11px] text-gray-500 mt-1">
+                                                {p.logistique.transports[0].retour.lieuDepart} → {p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee}
+                                              </div>
+                                            </div>
+
+                                            {p.logistique.transports[0].retour.correspondanceLieu && (
+                                              <div className="flex items-center gap-2 pl-12 text-[10px] font-bold text-gray-400 italic">
+                                                <div className="w-4 h-px bg-gray-200" />
+                                                <span>⇄ Correspondance à {p.logistique.transports[0].retour.correspondanceLieu} · {p.logistique.transports[0].retour.correspondanceDuree || ''}</span>
+                                              </div>
+                                            )}
+
+                                            {p.logistique.transports[0].retour.correspondanceLieu && (
+                                              <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                <div className="flex justify-between items-start mb-2">
+                                                  <span className="px-2 py-0.5 bg-orange-400 text-white text-[9px] font-black rounded-lg shadow-sm">{p.logistique.transports[0].retour.correspondanceNumero || 'TRAIN 2'}</span>
+                                                  <span className="text-[10px] font-bold text-gray-400"></span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-lg font-black text-gray-900 dark:text-gray-100">
+                                                   <span>{p.logistique.transports[0].retour.correspondanceHeure}</span>
+                                                   <ChevronRight className="w-4 h-4 text-gray-300" />
+                                                   <span>{p.logistique.transports[0].retour.arrivee}</span>
+                                                </div>
+                                                <div className="text-[11px] text-gray-500 mt-1">
+                                                  {p.logistique.transports[0].retour.correspondanceLieu} → {p.logistique.transports[0].retour.lieuArrivee}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-xs text-gray-300 italic">Transport Aller non défini</div>
+                                      )}
+                                    </>
                                   )}
 
-                                  {/* Retour */}
-                                  {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].retour ? (
-                                    <div className="flex items-start gap-2 mt-4 pt-4 border-t border-gray-50">
-                                      <div className="mt-1 text-orange-400">
-                                        {p.logistique.transports[0].retour.type === 'TRAIN' ? <Train className="w-4 h-4" /> : <Plane className="w-4 h-4" />}
-                                      </div>
-                                      <div className="flex-1 text-xs">
-                                        <div className="space-y-0.5">
-                                          <p className="font-bold text-gray-900 leading-tight">
-                                            {p.logistique.transports[0].retour.lieuDepart || '?'} → {p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee || '?'}
-                                          </p>
-
-                                          {p.logistique.transports[0].retour.correspondanceLieu && (
-                                            <>
-                                              <div className="ml-1.5 py-1 border-l-2 border-dashed border-orange-100 pl-3 my-0.5">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-[9px] font-black text-orange-500 uppercase bg-orange-50 px-1.5 py-0.5 rounded">Escale: {p.logistique.transports[0].retour.correspondanceLieu}</span>
-                                                  <span className="text-[9px] text-gray-400 font-medium">{p.logistique.transports[0].retour.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].retour.correspondanceHeure || '--:--'}</span>
-                                                </div>
-                                              </div>
-                                              <p className="font-bold text-gray-900 leading-tight">
-                                                {p.logistique.retour.correspondanceLieu} → {p.logistique.retour.lieuArrivee || '?'}
-                                              </p>
-                                            </>
-                                          )}
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-2 mt-1.5 opacity-60">
-                                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{p.logistique.transports[0].retour.date || '---'}</span>
-                                           <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                                           <span className="text-[9px] font-bold text-orange-600">{p.logistique.transports[0].retour.depart || '--:--'} à {p.logistique.transports[0].retour.arrivee || '--:--'}</span>
-                                           <span className="text-[8px] text-gray-400">({p.logistique.transports[0].retour.numero})</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : null}
-
                                   {/* Hotel */}
-                                  {p.logistique.hotels && p.logistique.hotels[0]?.nom && (
-                                    <div className="flex items-start gap-2">
+                                  {p.logistique.hotels?.[0]?.nom && (
+                                    <div className="flex items-start gap-2 mt-2 pt-2 border-t border-gray-50 border-dotted">
                                       <div className="mt-0.5 text-indigo-500">
                                         <Hotel className="w-3.5 h-3.5" />
                                       </div>
                                       <div className="flex-1 text-xs">
                                         <p className="font-bold text-gray-800">{p.logistique.hotels[0].nom}</p>
                                         <p className="text-[10px] text-gray-500">
-                                          {(p.logistique.hotels[0].checkIn || p.logistique.hotels[0].checkOut) ? (
-                                            <>Du {p.logistique.hotels[0].checkIn} au {p.logistique.hotels[0].checkOut}</>
-                                          ) : 'Dates non précisées'}
+                                          {p.logistique.hotels[0].checkIn} au {p.logistique.hotels[0].checkOut}
                                         </p>
                                       </div>
                                     </div>
                                   )}
-                                  <div className="flex items-center justify-between mt-2">
+
+                                  <div className="flex items-center justify-between mt-4">
                                     <button
                                       onClick={() => openLogistiqueModal(p)}
                                       className="text-[10px] font-black text-blue-400 hover:text-blue-600 transition-colors uppercase tracking-widest block"
                                     >
-                                      Modifier
+                                      Modifier {p.logistique.transports && p.logistique.transports.length > 1 ? `(${p.logistique.transports.length} options)` : ''}
                                     </button>
-                                    {p.logistique.transports.length > 1 && (
-                                      <span className="text-[9px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                        {p.logistique.transports.length} Options proposées
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                               )}
@@ -1682,6 +1707,61 @@ export default function Dashboard() {
                   </h4>
 
                   <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        const text = prompt("Collez ici le texte du récapitulatif de voyage (SNCF, Google Flights, etc.) :");
+                        if (text) {
+                          // Tentative de parsing intelligent (Regex simple pour SNCF Connect)
+                          const times = text.match(/\d{2}:\d{2}/g) || [];
+                          const trainMatch = text.match(/(?:TGV INOUI|OUIGO|TER|INTERCITÉ|TGV|Bus|Train)\s+(?:n°\s+)?(\d+)/i);
+                          const dateMatch = text.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+(\d+\s+\w+)/i);
+                          
+                          // Parsing des gares : on cherche les lignes qui commencent ou finissent par une heure
+                          const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+                          let gares = [];
+                          lines.forEach(line => {
+                            const timeMatch = line.match(/^(\d{2}:\d{2})\s+(.+)$/) || line.match(/^(.+)\s+(\d{2}:\d{2})$/);
+                            if (timeMatch) {
+                              const time = timeMatch[1].includes(':') ? timeMatch[1] : timeMatch[2];
+                              const name = timeMatch[1].includes(':') ? timeMatch[2] : timeMatch[1];
+                              // Nettoyage rapide du nom
+                              const cleanName = name.replace(/^(TGV INOUI|OUIGO|TER|INTERCITÉ|TGV|Bus|Ligne|Train|Car)\s*/i, "").trim();
+                              gares.push({ time, name: cleanName });
+                            }
+                          });
+
+                          if (gares.length >= 2) {
+                            const newProp = propositionVide();
+                            newProp.aller.date = dateMatch ? dateMatch[1] : "";
+                            newProp.aller.depart = gares[0].time;
+                            newProp.aller.lieuDepart = gares[0].name;
+                            newProp.aller.numero = trainMatch ? trainMatch[1] : "";
+                            
+                            if (gares.length === 2) {
+                               newProp.aller.arrivee = gares[1].time;
+                               newProp.aller.lieuArrivee = gares[1].name;
+                            } else if (gares.length >= 4) {
+                               // Probablement une escale
+                               newProp.aller.correspondanceLieu = gares[1].name;
+                               newProp.aller.correspondanceArrivee = gares[1].time;
+                               newProp.aller.correspondanceHeure = gares[2].time;
+                               newProp.aller.arrivee = gares[3].time;
+                               newProp.aller.lieuArrivee = gares[3].name;
+                            } else {
+                               newProp.aller.arrivee = gares[gares.length-1].time;
+                               newProp.aller.lieuArrivee = gares[gares.length-1].name;
+                            }
+                            
+                            setTransports(t => [...t, newProp]);
+                          } else {
+                            alert("Format non reconnu. Essayez de copier tout le texte du récapitulatif.");
+                          }
+                        }
+                      }}
+                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center gap-2"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-indigo-600" /> Remplissage Intelligent
+                    </button>
                     {transports.length < 3 && (
                       <button
                         onClick={() => setTransports(t => [...t, propositionVide()])}
@@ -1727,58 +1807,80 @@ export default function Dashboard() {
                               onClick={() => selectedCongres && openSNCF(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, prop.retour.date || selectedCongres.dateFin, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
-                              <Train className="w-2.5 h-2.5" /> Train
+                              <Train className="w-2.5 h-2.5" /> Train (SNCF)
+                            </button>
+                            <button
+                              onClick={() => selectedCongres && openTrainline(currentParticipant.villeDepart, selectedCongres.lieu || selectedCongres.nom, prop.aller.date || selectedCongres.dateDebut || selectedCongres.date, prop.retour.date || selectedCongres.dateFin, undefined, selectedCongres.id, currentParticipant.id)}
+                              className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Train className="w-2.5 h-2.5" /> Trainline
                             </button>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-2">
-                          <input type="text" placeholder="Départ (Gare / Aéroport)" className="w-full bg-white border border-blue-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
-                          
-                          <div className="relative px-6">
-                            <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-blue-100"></div>
-                            <div className="flex gap-2 items-center bg-blue-50/50 p-2 rounded-xl">
-                              <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
+                          <div className="flex items-center gap-2 pl-2">
+                             <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</div>
+                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Train 1 : Aller</label>
+                          </div>
+                          <div className="space-y-1 bg-blue-50/50 p-3 rounded-xl border border-blue-100 shadow-sm group hover:border-blue-300 transition-all">
+                            <div className="flex gap-2 items-center">
+                              <input type="text" placeholder="Départ" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
+                              <input type="time" className="bg-white border border-blue-100 rounded px-1 text-[11px] font-black w-16" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
+                              <span className="text-blue-300 font-bold">→</span>
+                              <input type="text" placeholder="Arrivée Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-blue-600" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
+                              <input type="time" className="bg-white border border-blue-100 rounded px-1 text-[11px] font-black w-14 text-blue-600" value={prop.aller.correspondanceLieu ? prop.aller.correspondanceArrivee : prop.aller.arrivee} 
+                                onChange={e => updateTransport(idx, 'aller', prop.aller.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} 
+                              />
+                            </div>
+                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-blue-100/50">
+                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
                                 <option value="TRAIN">🚆</option>
                                 <option value="FLIGHT">✈️</option>
                               </select>
-                              <input type="text" placeholder="Ville d'escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
-                              <input type="text" placeholder="N°" className="w-20 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
-                              <input type="date" className="bg-transparent border-none p-1 text-[10px] font-bold w-28" value={prop.aller.correspondanceDate || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} />
-                              <div className="flex items-center gap-1 px-2 border-l border-blue-200">
-                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
-                                <span className="text-blue-300 text-[10px]">→</span>
-                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.aller.correspondanceArrivee || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceArrivee', e.target.value)} />
-                              </div>
+                              <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-500" value={prop.aller.date || ''} onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} />
+                              <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
+                              <input type="text" placeholder="Durée" className="w-16 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.duree || ''} onChange={e => updateTransport(idx, 'aller', 'duree', e.target.value)} />
+                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.aller.classe || '2de classe'} onChange={e => updateTransport(idx, 'aller', 'classe', e.target.value)}>
+                                <option value="1ère classe">1ère</option>
+                                <option value="2de classe">2de</option>
+                              </select>
+                              <input type="text" placeholder="Placement" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.placement || ''} onChange={e => updateTransport(idx, 'aller', 'placement', e.target.value)} />
                             </div>
                           </div>
 
-
-                          <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-blue-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
-                        </div>
-
-                        <div className="flex gap-2 p-2 bg-gray-50 rounded-xl items-center">
-                          <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
-                            <option value="TRAIN">🚆</option>
-                            <option value="FLIGHT">✈️</option>
-                          </select>
-                          <input type="text" placeholder="Train/Vol n°" className="w-24 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
-                          <input type="date" className="flex-1 bg-transparent border-none p-1 text-xs font-bold" value={prop.aller.date} onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} />
-                          <div className="flex items-center gap-1 px-2 border-l border-gray-200">
-                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
-                             <span className="text-gray-300">→</span>
-                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.aller.arrivee} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
+                          <div className="flex items-center gap-2 pl-2 mt-2">
+                             <div className="w-5 h-5 bg-blue-400 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</div>
+                             <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Train 2 : Correspondance</label>
+                          </div>
+                          <div className="space-y-1 bg-blue-50/20 p-3 rounded-xl border border-blue-50 shadow-sm group hover:border-blue-200 transition-all">
+                            <div className="flex gap-2 items-center">
+                              <input type="text" placeholder="Départ Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-blue-600" value={prop.aller.correspondanceLieu || ''} 
+                                onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} 
+                              />
+                              <input type="time" className="bg-white border border-blue-50 rounded px-1 text-[11px] font-black w-16 text-blue-600" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
+                              <span className="text-blue-300 font-bold">→</span>
+                              <input type="text" placeholder="Arrivée Finale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
+                              <input type="time" className="bg-white border border-blue-50 rounded px-1 text-[11px] font-black w-14" value={prop.aller.arrivee || ''} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
+                            </div>
+                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-blue-50/50">
+                               <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-400" value={prop.aller.correspondanceDate || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} />
+                               <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
+                               <input type="text" placeholder="Temps Escale" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200" value={prop.aller.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDuree', e.target.value)} />
+                            </div>
                           </div>
                         </div>
+
                       </div>
 
+
                       {/* Retour */}
-                      <div className="space-y-4 pt-6 mt-6 border-t border-blue-100">
-                        <div className="flex justify-between items-center">
+                      <div className="space-y-4 pt-6 mt-6 border-t border-orange-100">
+                        <div className="flex justify-between items-center not-italic">
                           <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" /> Retour (vers domicile)
+                             <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" /> Retour (vers domicile)
                           </p>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 mr-24">
                             <button
                               onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
@@ -1789,49 +1891,70 @@ export default function Dashboard() {
                               onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
                               className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
                             >
-                              <Train className="w-2.5 h-2.5" /> Train
+                              <Train className="w-2.5 h-2.5" /> Train (SNCF)
+                            </button>
+                            <button
+                              onClick={() => selectedCongres && openTrainline(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
+                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
+                            >
+                              <Train className="w-2.5 h-2.5" /> Trainline
                             </button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2">
-                          <input type="text" placeholder="Départ (Gare / Aéroport)" className="w-full bg-white border border-orange-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
-                          
-                          <div className="relative px-6">
-                            <div className="absolute left-10 top-[-8px] bottom-[-8px] border-l-2 border-dashed border-orange-100"></div>
-                            <div className="flex gap-2 items-center bg-orange-50/50 p-2 rounded-xl">
-                              <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
+                        <div className="grid grid-cols-1 gap-2 not-italic">
+                          <div className="flex items-center gap-2 pl-2">
+                             <div className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</div>
+                             <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Train 1 : Retour</label>
+                          </div>
+                          <div className="space-y-1 bg-orange-50/50 p-3 rounded-xl border border-orange-100 shadow-sm group hover:border-orange-300 transition-all">
+                            <div className="flex gap-2 items-center">
+                              <input type="text" placeholder="Départ" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
+                              <input type="time" className="bg-white border border-orange-100 rounded px-1 text-[11px] font-black w-16" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
+                              <span className="text-orange-300 font-bold">→</span>
+                              <input type="text" placeholder="Arrivée Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-orange-600" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
+                              <input type="time" className="bg-white border border-orange-100 rounded px-1 text-[11px] font-black w-14 text-orange-600" value={prop.retour.correspondanceLieu ? prop.retour.correspondanceArrivee : prop.retour.arrivee} 
+                                onChange={e => updateTransport(idx, 'retour', prop.retour.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} 
+                              />
+                            </div>
+                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-orange-100/50">
+                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
                                 <option value="TRAIN">🚆</option>
                                 <option value="FLIGHT">✈️</option>
                               </select>
-                              <input type="text" placeholder="Ville d'escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
-                              <input type="text" placeholder="N°" className="w-20 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
-                              <input type="date" className="bg-transparent border-none p-1 text-[10px] font-bold w-28" value={prop.retour.correspondanceDate || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} />
-                              <div className="flex items-center gap-1 px-2 border-l border-orange-200">
-                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
-                                <span className="text-orange-300 text-[10px]">→</span>
-                                <input type="time" className="bg-transparent border-none p-1 text-[10px] font-bold w-14" value={prop.retour.correspondanceArrivee || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceArrivee', e.target.value)} />
-                              </div>
+                              <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-500" value={prop.retour.date || ''} onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} />
+                              <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
+                              <input type="text" placeholder="Durée" className="w-16 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.duree || ''} onChange={e => updateTransport(idx, 'retour', 'duree', e.target.value)} />
+                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.retour.classe || '2de classe'} onChange={e => updateTransport(idx, 'retour', 'classe', e.target.value)}>
+                                <option value="1ère classe">1ère</option>
+                                <option value="2de classe">2de</option>
+                              </select>
+                              <input type="text" placeholder="Placement" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.placement || ''} onChange={e => updateTransport(idx, 'retour', 'placement', e.target.value)} />
                             </div>
                           </div>
 
-
-                          <input type="text" placeholder="Arrivée (Gare / Aéroport)" className="w-full bg-white border border-orange-50 rounded-xl p-3 text-sm font-bold shadow-sm" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
-                        </div>
-
-                        <div className="flex gap-2 p-2 bg-gray-50 rounded-xl items-center">
-                          <select className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest p-1" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
-                            <option value="TRAIN">🚆</option>
-                            <option value="FLIGHT">✈️</option>
-                          </select>
-                          <input type="text" placeholder="Train/Vol n°" className="w-24 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
-                          <input type="date" className="flex-1 bg-transparent border-none p-1 text-xs font-bold" value={prop.retour.date} onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} />
-                          <div className="flex items-center gap-1 px-2 border-l border-gray-200">
-                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
-                             <span className="text-gray-300">→</span>
-                             <input type="time" className="bg-transparent border-none p-1 text-xs font-bold w-16" value={prop.retour.arrivee} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
+                          <div className="flex items-center gap-2 pl-2 mt-2">
+                             <div className="w-5 h-5 bg-orange-400 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</div>
+                             <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Train 2 : Correspondance</label>
+                          </div>
+                          <div className="space-y-1 bg-orange-50/20 p-3 rounded-xl border border-orange-50 shadow-sm group hover:border-orange-200 transition-all">
+                            <div className="flex gap-2 items-center">
+                              <input type="text" placeholder="Départ Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-orange-600" value={prop.retour.correspondanceLieu || ''} 
+                                onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} 
+                              />
+                              <input type="time" className="bg-white border border-orange-50 rounded px-1 text-[11px] font-black w-16 text-orange-600" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
+                              <span className="text-orange-300 font-bold">→</span>
+                              <input type="text" placeholder="Arrivée Finale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
+                              <input type="time" className="bg-white border border-orange-50 rounded px-1 text-[11px] font-black w-14" value={prop.retour.arrivee || ''} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
+                            </div>
+                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-orange-50/50">
+                               <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-400" value={prop.retour.correspondanceDate || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} />
+                               <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
+                               <input type="text" placeholder="Temps Escale" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200" value={prop.retour.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDuree', e.target.value)} />
+                            </div>
                           </div>
                         </div>
+
                       </div>
                     </div>
                   ))}

@@ -53,21 +53,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         let transportSummary = "";
         if (transportData.aller) {
             const a = transportData.aller;
-            transportSummary += `✅ ALLER: ${a.depart} → ${a.arrivee} (${a.departureTime})\n${a.numero}${a.correspondanceLieu ? ` (Escale: ${a.correspondanceLieu})` : ''}\n`;
-        } else {
-            transportSummary += `❌ ALLER: Non détecté\n`;
+            transportSummary += `🔵 ALLER (${a.date || ''})\n`;
+            transportSummary += `${a.depart} **${a.departureTime}** ${a.numero ? `(N°${a.numero})` : ''} → ${a.correspondanceLieu || a.arrivee} **${a.correspondanceArrivee || a.arrivalTime}**\n`;
+            if (a.correspondanceLieu) {
+                transportSummary += `${a.correspondanceLieu} **${a.correspondanceHeure}** ${a.correspondanceNumero ? `(N°${a.correspondanceNumero})` : ''} → ${a.arrivee} **${a.arrivalTime}**\n`;
+            }
         }
- 
+
         if (transportData.retour) {
             const r = transportData.retour;
-            transportSummary += `\n✅ RETOUR: ${r.depart} → ${r.arrivee} (${r.departureTime})\n${r.numero}${r.correspondanceLieu ? ` (Escale: ${r.correspondanceLieu})` : ''}\n`;
-        } else {
-            transportSummary += `\n❌ RETOUR: Non détecté\n`;
+            transportSummary += `\n🟠 RETOUR (${r.date || ''})\n`;
+            transportSummary += `${r.depart} **${r.departureTime}** ${r.numero ? `(N°${r.numero})` : ''} → ${r.correspondanceLieu || r.arrivee} **${r.correspondanceArrivee || r.arrivalTime}**\n`;
+            if (r.correspondanceLieu) {
+                transportSummary += `${r.correspondanceLieu} **${r.correspondanceHeure}** ${r.correspondanceNumero ? `(N°${r.correspondanceNumero})` : ''} → ${r.arrivee} **${r.arrivalTime}**\n`;
+            }
         }
 
-
-        transportInfoEl.innerText = transportSummary;
-        transportInfoEl.style.whiteSpace = 'pre-line';
+        transportInfoEl.innerHTML = transportSummary.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        transportInfoEl.style.fontSize = '10px';
 
         sendBtn.disabled = !(hotelData || transportData.aller || transportData.retour) || !participantIdInput.value.trim();
     }

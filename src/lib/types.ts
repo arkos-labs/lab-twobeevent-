@@ -11,6 +11,10 @@ export interface Trajet {
   correspondanceArrivee?: string;
   correspondanceDate?: string;
   correspondanceNumero?: string;
+  duree?: string;
+  classe?: string;
+  placement?: string;
+  correspondanceDuree?: string;
 }
 
 
