@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   FileUp, Users, CheckCircle2, Loader2, FileDown,
   MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
-  Moon, Sun, Wand2, Zap, ArrowRight
+  Moon, Sun, Wand2, Zap, ArrowRight, Eye
 } from 'lucide-react';
+import { ParticipantDetailsModal } from './ParticipantDetailsModal';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import { openGoogleFlights, openGoogleHotels, openSNCF, openTrainline } from '@/lib/searchUtils';
 import { fetchAddressSuggestions } from '@/lib/autocomplete';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
-import type { Congres, ExportHistory, ExportHistoryRow, Participant, PropositionHotel, PropositionTransport, Trajet } from '@/lib/types';
+import type { Congres, ExportHistory, ExportHistoryRow, Participant, PropositionHotel, PropositionTransport, Segment, Trajet } from '@/lib/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,8 @@ export default function Dashboard() {
 
   // ── Modale ajout congrès ──
   const [addCongressOpen, setAddCongressOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [participantForDetails, setParticipantForDetails] = useState<Participant | null>(null);
   const [newNom, setNewNom] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newDateFin, setNewDateFin] = useState('');
@@ -191,6 +194,15 @@ export default function Dashboard() {
   };
 
   // ─── Sélection congrès ───────────────────────────────────────────────────────
+  // --- Synchronisation avec l'extension Twobeevent ---
+  React.useEffect(() => {
+    if (modalOpen && currentParticipant?.id) {
+      document.body.setAttribute('data-twb-active-pid', currentParticipant.id);
+    } else {
+      document.body.removeAttribute('data-twb-active-pid');
+    }
+  }, [modalOpen, currentParticipant]);
+
   const selectedCongres = congres.find(c => c.id === selectedId) ?? null;
 
   const updateParticipants = (congresId: string, updater: (ps: Participant[]) => Participant[]) => {
@@ -1154,7 +1166,7 @@ export default function Dashboard() {
               {/* Header Info */}
               <div className="flex justify-between items-end">
                 <div>
-                  <h2 className={`text-3xl font-extrabold tracking-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{selectedCongres.nom}</h2>
+                  <h2 className={`text-4xl font-black tracking-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{selectedCongres.nom}</h2>
                    <div className="text-gray-400 mt-2 font-bold flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       {selectedCongres.lieu && (
@@ -1185,7 +1197,7 @@ export default function Dashboard() {
 
               {/* Stats Grid avec cercle de progression */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <div className={`col-span-2 md:col-span-1 p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group ${isDark ? 'bg-[#161B27]' : 'bg-white'}`}>
+                <div className={`col-span-2 md:col-span-1 p-6 md:p-8 rounded-[48px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden group ${isDark ? 'bg-[#161B27]' : 'bg-white'}`}>
                   <div className="relative w-32 h-32 mb-4">
                     <svg className="w-full h-full -rotate-90">
                       <circle cx="64" cy="64" r="58" stroke="#F1F5F9" strokeWidth="8" fill="transparent" />
@@ -1205,7 +1217,7 @@ export default function Dashboard() {
                     { label: 'À traiter', val: stats.aTraiter, color: 'amber', icon: AlertCircle, sub: 'Prioritaire' },
                     { label: 'En attente', val: stats.attente, color: 'indigo', icon: Clock, sub: 'PDF envoyés' },
                   ].map((s) => (
-                    <div key={s.label} className={`p-6 md:p-8 rounded-[40px] shadow-sm flex flex-col justify-between hover:translate-y-[-4px] transition-all border ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-white'}`}>
+                    <div key={s.label} className={`p-6 md:p-8 rounded-[48px] shadow-sm flex flex-col justify-between hover:translate-y-[-4px] transition-all border ${isDark ? 'bg-[#161B27] border-[#1F2937]' : 'bg-white border-white'}`}>
                       <div className="flex justify-between items-start">
                         <div className={`p-4 rounded-3xl bg-${s.color}-50 text-${s.color}-600`}>
                           <s.icon className="w-6 h-6" />
@@ -1249,7 +1261,7 @@ export default function Dashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className={`text-[11px] font-bold text-gray-400 uppercase tracking-widest ${isDark ? 'bg-gray-900/50' : 'bg-gray-50/50'}`}>
+                      <tr className={`text-[12px] font-black text-gray-600 dark:text-gray-300 uppercase tracking-[0.15em] ${isDark ? 'bg-gray-900/50' : 'bg-gray-50/50'}`}>
                         <th className="px-8 py-4 w-10">
                           <input
                             type="checkbox"
@@ -1258,20 +1270,26 @@ export default function Dashboard() {
                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </th>
-                        <th className="px-8 py-4">Contact</th>
-                        <th className="px-8 py-4">Ville / Tel</th>
-                        <th className="px-8 py-4">Détails Logistique</th>
-                        <th className="px-8 py-4">Statut</th>
-                        <th className="px-8 py-4 text-right pr-12">Actions</th>
+                        <th className="px-6 py-4">Contact</th>
+                        <th className="px-6 py-4">Ville</th>
+                        <th className="px-6 py-4">Aller (Trajet)</th>
+                        <th className="px-6 py-4">Retour (Trajet)</th>
+                        <th className="px-6 py-4 text-indigo-500">H\u00e9bergement</th>
+                        <th className="px-6 py-4 text-center">Statut</th>
+                        <th className="px-6 py-4 text-right pr-8">Modifier</th>
+                        <th className="px-6 py-4 text-right pr-12">Actions</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? 'divide-gray-700/50' : 'divide-gray-50'}`}>
                       {filteredParticipants.map(p => {
                         const loading = loadingIds.has(p.id);
+                        const transport = p.logistique?.transports?.[0];
+                        const hotel = p.logistique?.hotels?.[0];
+
                         return (
                           <tr key={p.id} className={`group transition-all ${selectedParticipants.has(p.id) ? 'bg-blue-50/30' : isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/50'}`}>
                             {/* Checkbox */}
-                            <td className="px-8 py-6">
+                            <td className="px-6 py-6 transition-all">
                               <input
                                 type="checkbox"
                                 checked={selectedParticipants.has(p.id)}
@@ -1280,240 +1298,175 @@ export default function Dashboard() {
                               />
                             </td>
                             {/* Contact */}
-                            <td className="px-8 py-6">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-lg shadow-sm border border-white">
+                            <td className="px-6 py-6 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm border border-white shrink-0">
                                   {p.nom.charAt(0)}
                                 </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <p className={`font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{p.nom}</p>
-                                    <button onClick={() => openContactModal(p)} className="p-1 hover:bg-gray-100 rounded-md transition-all">
-                                      <Mail className={`w-3 h-3 ${validateEmail(p.email) ? 'text-emerald-500' : 'text-red-400'}`} />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className={`font-black text-base truncate ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{p.nom}</p>
+                                    <button onClick={() => openContactModal(p)} className="p-0.5 hover:bg-gray-100 rounded transition-all">
+                                      <Mail className={`w-3.5 h-3.5 ${validateEmail(p.email) ? 'text-emerald-500' : 'text-red-400'}`} />
                                     </button>
                                   </div>
-                                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{p.email || 'Email manquant'}</p>
+                                  <p className="text-xs text-gray-400 font-bold truncate uppercase tracking-tight">{p.email || 'Email manquant'}</p>
                                 </div>
                               </div>
                             </td>
 
-                            {/* Ville / Tel */}
-                            <td className="px-8 py-6">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>DE</span>
-                                  <span className="text-sm font-bold truncate max-w-[150px]">{p.villeDepart}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-400">
-                                  <span className="text-[10px] font-black bg-gray-50 px-2 py-0.5 rounded text-gray-300">TEL</span>
-                                  <span className="text-[11px] font-bold">{p.telephone || '--'}</span>
-                                </div>
-                              </div>
+                            {/* Ville */}
+                            <td className="px-6 py-6 transition-all">
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate block max-w-[100px]">{p.villeDepart}</span>
                             </td>
 
-                            {/* Détails Logistique */}
-                            <td className="px-8 py-6">
-                              {!p.logistique ? (
-                                <button
-                                  onClick={() => openLogistiqueModal(p)}
-                                  className="text-[10px] font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all border border-blue-100"
-                                >
-                                  + SAISIR OPTIONS
-                                </button>
+                            {/* Aller (En ligne) */}
+                             <td className="px-6 py-6 transition-all min-w-[320px]">
+                               {transport?.aller ? (
+                                 <div className="flex flex-col gap-1.5 bg-blue-50/50 dark:bg-blue-900/10 p-2.5 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
+                                   <div className="flex items-center gap-2">
+                                     <div className="bg-blue-600 text-white p-1 rounded-md shadow-sm">
+                                       {transport.aller.type === 'FLIGHT' ? <Plane className="w-3 h-3" /> : <Train className="w-3 h-3" />}
+                                     </div>
+                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.aller.lieuDepart}</span>
+                                     <ArrowRight className="w-3 h-3 text-blue-400 shrink-0" />
+                                     
+                                     {transport.aller.correspondanceLieu && (
+                                       <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 rounded-lg border-2 border-amber-200 dark:border-amber-800/50 shadow-sm shrink-0 group/escale relative">
+                                         <MapPin className="w-3 h-3 text-amber-600 animate-bounce" />
+                                         <span className="font-black text-amber-800 dark:text-amber-200 text-[9px] tracking-widest uppercase">ESCALE : {transport.aller.correspondanceLieu}</span>
+                                         <ArrowRight className="w-2 h-2 text-amber-400 shrink-0" />
+                                       </div>
+                                     )}
+                                     
+                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.aller.lieuArrivee}</span>
+                                   </div>
+
+                                   <div className="flex items-center justify-between text-[10px]">
+                                     <div className="flex items-center gap-2">
+                                       <Calendar className="w-3 h-3 text-blue-500" />
+                                       <span className="font-black text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">{transport.aller.date || '??'}</span>
+                                       {transport.aller.correspondanceLieu && (
+                                         <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-100/50 dark:bg-amber-950/20 px-2 py-0.5 rounded-md border border-amber-200/50 ml-2 italic">
+                                           Via {transport.aller.correspondanceLieu}
+                                         </span>
+                                       )}
+                                     </div>
+                                     <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-sm font-black text-blue-600 dark:text-blue-400 gap-1.5 ml-auto">
+                                       <span>{transport.aller.depart}</span>
+                                       {transport.aller.arrivee && (
+                                         <>
+                                           <span className="text-[8px] text-blue-300">-</span>
+                                           <span>{transport.aller.arrivee}</span>
+                                         </>
+                                       )}
+                                     </div>
+                                   </div>
+                                 </div>
+                               ) : (
+                                 <span className="text-[10px] font-black text-gray-300 uppercase italic">Aller non saisi</span>
+                               )}
+                             </td>
+
+                             {/* Retour (En ligne) */}
+                             <td className="px-6 py-6 transition-all min-w-[320px]">
+                               {transport?.retour ? (
+                                 <div className="flex flex-col gap-1.5 bg-orange-50/50 dark:bg-orange-900/10 p-2.5 rounded-xl border border-orange-100 dark:border-orange-900/30 shadow-sm">
+                                   <div className="flex items-center gap-2">
+                                     <div className="bg-orange-600 text-white p-1 rounded-md shadow-sm">
+                                       {transport.retour.type === 'FLIGHT' ? <Plane className="w-3 h-3" /> : <Train className="w-3 h-3" />}
+                                     </div>
+                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.retour.lieuDepart}</span>
+                                     <ArrowRight className="w-3 h-3 text-orange-400 shrink-0" />
+                                     
+                                     {transport.retour.correspondanceLieu && (
+                                       <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 rounded-lg border-2 border-amber-200 dark:border-amber-800/50 shadow-sm shrink-0 group/escale relative">
+                                         <MapPin className="w-3 h-3 text-amber-600 animate-bounce" />
+                                         <span className="font-black text-amber-800 dark:text-amber-200 text-[9px] tracking-widest uppercase">ESCALE : {transport.retour.correspondanceLieu}</span>
+                                         <ArrowRight className="w-2 h-2 text-amber-400 shrink-0" />
+                                       </div>
+                                     )}
+                                     
+                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.retour.lieuArrivee}</span>
+                                   </div>
+
+                                   <div className="flex items-center justify-between text-[10px]">
+                                     <div className="flex items-center gap-2">
+                                       <Calendar className="w-3 h-3 text-orange-500" />
+                                       <span className="font-black text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-1.5 py-0.5 rounded">{transport.retour.date || '??'}</span>
+                                       {transport.retour.correspondanceLieu && (
+                                         <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-100/50 dark:bg-amber-950/20 px-2 py-0.5 rounded-md border border-amber-200/50 ml-2 italic">
+                                           Via {transport.retour.correspondanceLieu}
+                                         </span>
+                                       )}
+                                     </div>
+                                     <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-sm font-black text-orange-600 dark:text-orange-400 gap-1.5 ml-auto">
+                                       <span>{transport.retour.depart}</span>
+                                       {transport.retour.arrivee && (
+                                         <>
+                                           <span className="text-[8px] text-orange-300">-</span>
+                                           <span>{transport.retour.arrivee}</span>
+                                         </>
+                                       )}
+                                     </div>
+                                   </div>
+                                 </div>
+                               ) : (
+                                 <span className="text-[10px] font-black text-gray-300 uppercase italic">Retour non saisi</span>
+                               )}
+                             </td>
+                            {/* Hotel */}
+                            <td className="px-6 py-6 transition-all">
+                              {hotel?.nom ? (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Hotel className="w-4 h-4 text-indigo-500" />
+                                  <span className="font-black text-gray-900 dark:text-gray-100 truncate max-w-[140px] underline decoration-indigo-100 underline-offset-4">{hotel.nom}</span>
+                                </div>
                               ) : (
-                                <div className="space-y-4 max-w-[280px]">
-                                  {p.logistique.transports?.[0] && (
-                                    <>
-                                      {/* Aller */}
-                                      {p.logistique.transports[0].aller && (
-                                        <div className="space-y-4">
-                                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-tighter text-blue-500/80">
-                                            <span>Aller — {p.logistique.transports[0].aller.date || 'Date non précisée'}</span>
-                                          </div>
-
-                                          <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-blue-100 dark:before:bg-blue-900/40">
-                                            {(() => {
-                                              const a = p.logistique.transports[0].aller;
-                                              const segments = a.segments && a.segments.length > 0 ? a.segments : [
-                                                { 
-                                                  lieuDepart: a.lieuDepart, 
-                                                  lieuArrivee: a.correspondanceLieu || a.lieuArrivee || 'Arrivée',
-                                                  depart: a.depart,
-                                                  arrivee: a.correspondanceArrivee || a.arrivee,
-                                                  numero: a.numero,
-                                                  date: a.date 
-                                                },
-                                                ...(a.correspondanceLieu ? [{
-                                                  lieuDepart: a.correspondanceLieu,
-                                                  lieuArrivee: a.lieuArrivee || 'Arrivée',
-                                                  depart: a.correspondanceHeure,
-                                                  arrivee: a.arrivee,
-                                                  numero: a.correspondanceNumero || 'TRAIN 2',
-                                                  date: a.correspondanceDate || a.date
-                                                }] : [])
-                                              ];
-
-                                              return segments.map((seg, idx) => (
-                                                <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                     <span>{seg.lieuDepart || 'Départ'}</span>
-                                                     <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                     <span>{seg.lieuArrivee || 'Arrivée'}</span>
-                                                  </div>
-                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {seg.date || a.date}</span>
-                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {seg.depart}</span>
-                                                    <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {seg.numero || 'TRAIN'}</span>
-                                                  </div>
-                                                </div>
-                                              ));
-                                            })()}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Retour */}
-                                      {p.logistique.transports[0].retour && (
-                                        <div className="space-y-4 mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
-                                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-tighter text-orange-500/80">
-                                            <span>Retour — {p.logistique.transports[0].retour.date || 'Date non précisée'}</span>
-                                          </div>
-
-                                          <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-orange-100 dark:before:bg-orange-900/40">
-                                            {(() => {
-                                              const r = p.logistique.transports[0].retour;
-                                              const segments = r.segments && r.segments.length > 0 ? r.segments : [
-                                                { 
-                                                  lieuDepart: r.lieuDepart, 
-                                                  lieuArrivee: r.correspondanceLieu || r.lieuArrivee || 'Arrivée',
-                                                  depart: r.depart,
-                                                  arrivee: r.correspondanceArrivee || r.arrivee,
-                                                  numero: r.numero,
-                                                  date: r.date 
-                                                },
-                                                ...(r.correspondanceLieu ? [{
-                                                  lieuDepart: r.correspondanceLieu,
-                                                  lieuArrivee: r.lieuArrivee || 'Arrivée',
-                                                  depart: r.correspondanceHeure,
-                                                  arrivee: r.arrivee,
-                                                  numero: r.correspondanceNumero || 'TRAIN 2',
-                                                  date: r.correspondanceDate || r.date
-                                                }] : [])
-                                              ];
-
-                                              return segments.map((seg, idx) => (
-                                                <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                     <span>{seg.lieuDepart || 'Départ'}</span>
-                                                     <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                     <span>{seg.lieuArrivee || 'Arrivée'}</span>
-                                                  </div>
-                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {seg.date || r.date}</span>
-                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {seg.depart}</span>
-                                                    <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {seg.numero || 'TRAIN'}</span>
-                                                  </div>
-                                                </div>
-                                              ));
-                                            })()}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {/* Hotel */}
-                                  {p.logistique.hotels?.[0]?.nom && (
-                                    <div className="flex items-start gap-2 mt-2 pt-2 border-t border-gray-50 border-dotted">
-                                      <div className="mt-0.5 text-indigo-500">
-                                        <Hotel className="w-3.5 h-3.5" />
-                                      </div>
-                                      <div className="flex-1 text-xs">
-                                        <p className="font-bold text-gray-800">{p.logistique.hotels[0].nom}</p>
-                                        <p className="text-[10px] text-gray-500">
-                                          {p.logistique.hotels[0].checkIn} au {p.logistique.hotels[0].checkOut}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <div className="flex items-center justify-between mt-4">
-                                    <button
-                                      onClick={() => openLogistiqueModal(p)}
-                                      className="text-[10px] font-black text-blue-400 hover:text-blue-600 transition-colors uppercase tracking-widest block"
-                                    >
-                                      Modifier {p.logistique.transports && p.logistique.transports.length > 1 ? `(${p.logistique.transports.length} options)` : ''}
-                                    </button>
-                                  </div>
-                                </div>
+                                <span className="text-[10px] text-gray-300 uppercase font-black">-</span>
                               )}
                             </td>
 
-                            {/* Statut */}
-                            <td className="px-8 py-6">
-                              <div className="flex flex-col items-start gap-2">
-                                <span className={`
-                                px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1.5
-                                ${p.statut === 'VALIDE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                    p.statut === 'ATTENTE_REPONSE' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
-                                      'bg-amber-50 text-amber-600 border border-amber-100'}
-                                `}>
-                                  {p.statut === 'VALIDE' && <CheckCircle2 className="w-3 h-3" />}
-                                  {p.statut === 'VALIDE' ? 'Validé' : p.statut === 'ATTENTE_REPONSE' ? 'En attente' : 'À traiter'}
-                                </span>
-                                {p.billetsEnvoyes && p.statut === 'VALIDE' && (
-                                  <span className="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1.5 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100 shadow-sm transition-all duration-300">
-                                    <Ticket className="w-3 h-3" /> Billets Envoyés
-                                  </span>
-                                )}
-                              </div>
+                            {/* Statut (Pastille) */}
+                            <td className="px-6 py-4 text-center">
+                              <span className={`
+                                w-2.5 h-2.5 rounded-full inline-block shadow-sm ring-4 ring-offset-0 
+                                ${p.statut === 'VALIDE' ? 'bg-emerald-500 ring-emerald-50' :
+                                  p.statut === 'ATTENTE_REPONSE' ? 'bg-indigo-500 ring-indigo-50' :
+                                  'bg-amber-400 ring-amber-50'}
+                              `} title={p.statut}></span>
                             </td>
 
-                            {/* Actions */}
-                            <td className="px-8 py-6 text-right pr-12">
-                              <div className="flex items-center justify-end gap-2">
+                            {/* Modifier Rapide */}
+                            <td className="px-6 py-6 text-right pr-8 transition-all">
+                              <button onClick={() => openLogistiqueModal(p)} className="p-2 hover:bg-blue-50 text-blue-500 rounded-lg transition-all">
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                            </td>
+
+                            {/* Actions Globales */}
+                            <td className="px-6 py-6 text-right pr-12 transition-all">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button onClick={() => { setParticipantForDetails(p); setDetailsOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Voir l'itinéraire complet">
+                                  <Eye className="w-4 h-4" />
+                                </button>
                                 {p.logistique && p.statut === 'A_TRAITER' && (
-                                  <button
-                                    onClick={() => handleGeneratePDFAndEmail(p)}
-                                    disabled={loading}
-                                    className="p-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md shadow-blue-100 disabled:opacity-50"
-                                  >
-                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailCheck className="w-4 h-4" />}
+                                  <button onClick={() => handleGeneratePDFAndEmail(p)} disabled={loading} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50">
+                                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MailCheck className="w-3.5 h-3.5" />}
                                   </button>
                                 )}
                                 {p.statut === 'ATTENTE_REPONSE' && (
-                                  <button
-                                    onClick={() => handleValidate(p.id)}
-                                    className="p-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
-                                    title="Valider la réservation"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                                {p.dejaExporte && (
-                                  <button
-                                    onClick={() => handleReExportParticipant(p.id)}
-                                    className="p-2.5 rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 transition-all border border-orange-100"
-                                    title="Remettre dans l'export Agence (en cas de modification)"
-                                  >
-                                    <ArchiveRestore className="w-4 h-4" />
+                                  <button onClick={() => handleValidate(p.id)} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                                 {p.statut === 'VALIDE' && (
-                                  <button
-                                    onClick={() => handleToggleBillet(p.id)}
-                                    className={`p-2.5 rounded-xl transition-all shadow-md ${p.billetsEnvoyes ? 'bg-fuchsia-600 text-white shadow-fuchsia-100 hover:bg-fuchsia-700' : 'bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100 hover:bg-fuchsia-100'}`}
-                                    title={p.billetsEnvoyes ? "Annuler l'envoi des billets" : "Marquer les billets comme envoyés"}
-                                  >
-                                    <Ticket className="w-4 h-4" />
+                                  <button onClick={() => handleToggleBillet(p.id)} className={`p-2 rounded-lg ${p.billetsEnvoyes ? 'bg-fuchsia-600 text-white' : 'bg-fuchsia-100 text-fuchsia-600'}`}>
+                                    <Ticket className="w-3.5 h-3.5" />
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => handleDeleteParticipant(p.id)}
-                                  className="p-2.5 rounded-xl bg-white border border-gray-200 text-gray-300 hover:text-red-500 transition-all"
-                                  title="Supprimer"
-                                >
-                                  <Trash2 className="w-4 h-4" />
+                                <button onClick={() => handleDeleteParticipant(p.id)} className="p-2 text-gray-300 hover:text-red-500">
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -1528,6 +1481,14 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {detailsOpen && (
+        <ParticipantDetailsModal 
+          open={detailsOpen} 
+          onClose={() => setDetailsOpen(false)} 
+          participant={participantForDetails} 
+        />
+      )}
 
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
@@ -1670,24 +1631,33 @@ export default function Dashboard() {
 
       {/* ───── MODALE SAISIE LOGISTIQUE (MODERNISÉ) ───── */}
       {modalOpen && currentParticipant && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[48px] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500">
-            {/* Header */}
-            <div className="p-10 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
-              <div>
-                <h3 className="text-3xl font-black tracking-tight">{currentParticipant.nom}</h3>
-                <p className="text-gray-400 font-medium text-sm mt-1">Gestion logistique pour {selectedCongres?.nom}</p>
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-4 selection:bg-blue-200">
+          <div className="bg-white dark:bg-slate-900 rounded-[48px] shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-500 border-4 border-blue-600/10">
+            {/* Header VIP */}
+            <div className="p-10 border-b-2 border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-blue-600 text-white rounded-[32px] flex items-center justify-center text-3xl font-black italic shadow-2xl shadow-blue-100 ring-8 ring-white dark:ring-slate-800">
+                  {currentParticipant.nom.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white uppercase italic">{currentParticipant.nom}</h3>
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="text-[12px] font-black uppercase text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-4 py-1.5 rounded-xl tracking-widest border-2 border-blue-100 dark:border-blue-800/50 shadow-sm">CONCIERGE LOGISTIQUE</span>
+                    <div className="h-4 w-[2px] bg-slate-200 dark:bg-slate-700" />
+                    <span className="text-sm font-bold text-slate-400 italic">Événement : {selectedCongres?.nom}</span>
+                  </div>
+                </div>
               </div>
               <div className="flex gap-4 items-center">
                 <div className="relative group">
-                  <button className="px-4 py-3 bg-white text-gray-500 hover:text-blue-600 rounded-2xl font-bold text-xs border border-gray-200 hover:border-blue-200 transition-all flex items-center gap-2 shadow-sm">
-                    <Copy className="w-4 h-4" /> Copier depuis...
+                  <button className="px-6 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 rounded-2xl font-black text-xs border-2 border-slate-100 dark:border-slate-700 hover:border-blue-200 transition-all flex items-center gap-3 shadow-xl hover:shadow-2xl hover:translate-y-[-2px]">
+                    <Copy className="w-5 h-5" /> COPIER D'UN COLLÈGUE
                   </button>
-                  <div className="absolute right-0 top-[100%] mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden max-h-[300px] overflow-y-auto">
+                  <div className="absolute right-0 top-[100%] mt-3 w-80 bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl border-2 border-slate-50 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden max-h-[400px] overflow-y-auto ring-1 ring-slate-100">
                     {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).length === 0 ? (
-                      <div className="p-4 text-xs text-gray-400 text-center font-medium">Aucun participant avec logistique validée</div>
+                      <div className="p-8 text-xs text-slate-400 text-center font-black italic">AUCUN DOSSIER DISPONIBLE</div>
                     ) : (
-                      <div className="p-2 space-y-1">
+                      <div className="p-4 space-y-2">
                         {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).map(p => (
                           <button
                             key={p.id}
@@ -1697,18 +1667,18 @@ export default function Dashboard() {
                                 setHotels(JSON.parse(JSON.stringify(p.logistique.hotels)));
                               }
                             }}
-                            className="w-full text-left px-4 py-3 hover:bg-blue-50 text-gray-700 hover:text-blue-700 text-xs font-bold rounded-xl transition-all flex items-center justify-between"
+                            className="w-full text-left px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-900 dark:text-slate-100 hover:text-blue-700 text-xs font-black rounded-2xl transition-all flex items-center justify-between group/item"
                           >
                             <span className="truncate flex-1">{p.nom}</span>
-                            <span className="text-[9px] uppercase tracking-widest text-blue-400 bg-blue-100 px-2 py-1 rounded ml-2 shrink-0">{p.logistique?.transports.length} opt</span>
+                            <span className="text-[9px] font-black text-blue-500 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-lg opacity-0 group-hover/item:opacity-100 transition-opacity">COPIER</span>
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
                 </div>
-                <button onClick={() => setModalOpen(false)} className="w-12 h-12 bg-white rounded-2xl border border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm flex items-center justify-center transition-all">
-                  <X className="w-6 h-6" />
+                <button onClick={() => setModalOpen(false)} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-100 dark:border-slate-700 text-slate-400 hover:text-red-500 shadow-xl flex items-center justify-center transition-all hover:rotate-90 hover:scale-110">
+                  <X className="w-10 h-10" />
                 </button>
               </div>
             </div>
@@ -1732,35 +1702,96 @@ export default function Dashboard() {
 
                         const parseSNCF = (rawText: string) => {
                           const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                          const isTime = (s: string) => /^\d{2}:\d{2}$/.test(s);
-                          const BLACKLIST = [/dur[eé]e/i, /trajet/i, /correspondance/i, /accueil/i, /placement/i, /voiture/i, /place/i, /classe/i, /^opéré/i, /wifi/i, /restauration/i];
+                          const timeRegex = /\b(\d{2})[hH:](\d{2})\b/;
+                          const extractTime = (s: string) => {
+                            const m = s.match(timeRegex);
+                            return m ? `${m[1]}:${m[2]}` : null;
+                          };
+                          const BLACKLIST = [/dur[eé]e/i, /trajet/i, /correspondance/i, /accueil/i, /placement/i, /voiture/i, /place/i, /classe/i, /^opéré/i, /wifi/i, /restauration/i, /bagage/i, /billet/i, /ouverture/i, /fermeture/i, /embarquement/i, /portes/i, /accès/i, /quai/i, /^aller/i, /^retour/i, /voyage/i, /récapitulatif/i, /details/i, /^option/i];
                           const isBlacklisted = (s: string) => BLACKLIST.some(r => r.test(s));
 
-                          const stops = [];
+                          const cleanStation = (s: string) => s.replace(timeRegex, '')
+                            .replace(/Arrivée|Départ|à|le|Vers|De|Pour/gi, '')
+                            .replace(/^(TGV INOUI|OUIGO|TER|INTERCITÉS?|TGV|Bus|Ligne|Train|Car|INTERCITES)\s*\d*/i, "")
+                            .replace(/\d+\s*min\s+d'arrêt.*/i, "")
+                            .replace(/Durée.*$/i, "")
+                            .replace(/Paris Montparnasse\s*\d+\s*Et\s*\d+/i, "Paris Montparnasse") // Normalisation Paris
+                            .replace(/\s+/g, ' ')
+                            .trim();
+
+                          const stops: { time: string, name: string }[] = [];
                           for (let i = 0; i < lines.length; i++) {
-                            if (isTime(lines[i])) {
-                              let name = "";
-                              for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-                                if (isTime(lines[j])) break;
-                                if (!isBlacklisted(lines[j]) && lines[j].length > 2 && lines[j].length < 60) {
-                                  name = lines[j].replace(/^(TGV INOUI|OUIGO|TER|INTERCITÉS?|TGV|Bus|Ligne|Train|Car)\s*/i, "").trim();
-                                  break;
+                            const line = lines[i];
+                            const tStr = extractTime(line);
+                            if (tStr) {
+                              if (isBlacklisted(line)) continue;
+                              
+                              let name = cleanStation(line);
+
+                              if (name.length <= 2 || /^\d+$/.test(name.replace(/\s+/g, ''))) {
+                                // 1. Look ahead
+                                for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+                                  if (timeRegex.test(lines[j]) && j > i + 1) break;
+                                  if (isBlacklisted(lines[j])) continue;
+                                  let c = cleanStation(lines[j]);
+                                  if (c.length > 2 && !/^\d+$/.test(c.replace(/\s+/g, ''))) {
+                                    name = c;
+                                    break;
+                                  }
+                                }
+                                // 2. Look behind
+                                if (!name) {
+                                  for (let j = i - 1; j >= Math.max(0, i - 4); j--) {
+                                    if (timeRegex.test(lines[j])) break;
+                                    if (isBlacklisted(lines[j])) continue;
+                                    let c = cleanStation(lines[j]);
+                                    if (c.length > 2 && !/^\d+$/.test(c.replace(/\s+/g, ''))) {
+                                      name = c;
+                                      break;
+                                    }
+                                  }
                                 }
                               }
-                              if (name) stops.push({ time: lines[i], name });
+                              if (name) stops.push({ time: tStr, name: name });
                             }
                           }
 
-                          const deduped = [];
+                          // Heuristic Globale
+                          const journeyMatch = rawText.match(/([A-Z][^0-9\n\r→>]+)(?:\s*[→>]\s*)([A-Z][^0-9\n\r]+)/i);
+                          let mainEnd = journeyMatch ? journeyMatch[2].trim() : "";
+                          if (!mainEnd) {
+                             const destMatch = rawText.match(/(?:Destination|Voyage\s+pour|Arrivée\s+à|Vers|Pour)\s*[:\s]+([A-Z][a-zàâéèêëïîôûùç]+(?:\s+[A-Z][a-zàâéèêëïîôûùç]+)*)/i);
+                             mainEnd = destMatch ? destMatch[1].trim() : "";
+                          }
+
+                          const deduped: { time: string, name: string }[] = [];
                           for (let i = 0; i < stops.length; i++) {
-                            if (i === 0 || stops[i].name !== stops[i-1].name) deduped.push(stops[i]);
+                            const currentName = stops[i].name.toLowerCase().replace(/[\s-]/g, '');
+                            const lastAdded = deduped[deduped.length - 1];
+                            const lastName = lastAdded ? lastAdded.name.toLowerCase().replace(/[\s-]/g, '') : null;
+                            
+                            if (!lastAdded || currentName !== lastName) {
+                              deduped.push(stops[i]);
+                            } else {
+                              // Même gare, on garde l'horaire le plus récent pour le segment suivant
+                              deduped[deduped.length - 1].time = stops[i].time;
+                            }
                           }
 
                           const trainNumbers = rawText.match(/(?:INTERCITÉS?|TGV INOUI|OUIGO|TER|Train li[Oo]|Autocar Rémi Exp|TGV)\s+\d+/gi) || [];
                           const cleanDate = (rawText.match(/((?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+\d+\s+\w+)/i) || ["", ""])[1];
 
-                          const createSegments = (stopList: any[]) => {
-                            const segs = [];
+                          const createTransportDetails = (stopList: any[]) => {
+                            if (stopList.length < 1) return null;
+                            
+                            // Si un seul stop, on essaie de compléter avec mainEnd
+                            if (stopList.length === 1 && mainEnd && mainEnd.toLowerCase() !== stopList[0].name.toLowerCase()) {
+                               stopList.push({ time: "", name: mainEnd });
+                            }
+
+                            if (stopList.length < 2) return null;
+                            
+                            const segs: Segment[] = [];
                             for (let i = 0; i < stopList.length - 1; i++) {
                               segs.push({
                                 depart: stopList[i].time,
@@ -1771,42 +1802,44 @@ export default function Dashboard() {
                                 date: cleanDate
                               });
                             }
-                            return segs;
+                            return {
+                              date: cleanDate,
+                              depart: segs[0].depart,
+                              arrivee: segs[segs.length - 1].arrivee,
+                              lieuDepart: segs[0].lieuDepart,
+                              lieuArrivee: segs[segs.length - 1].lieuArrivee,
+                              numero: segs[0].numero,
+                              type: 'TRAIN' as const,
+                              correspondanceLieu: segs.length > 1 ? segs[0].lieuArrivee : "",
+                              correspondanceHeure: segs.length > 1 ? segs[1].depart : "",
+                              correspondanceArrivee: segs.length > 1 ? segs[0].arrivee : "",
+                              correspondanceNumero: segs.length > 1 ? segs[1].numero : "",
+                              correspondanceDate: cleanDate
+                            };
                           };
 
                           const retourIdx = rawText.toLowerCase().indexOf('retour :');
-                          const allerStops = deduped.filter(s => rawText.indexOf(s.time) < (retourIdx !== -1 ? retourIdx : 999999));
-                          const retourStops = deduped.filter(s => rawText.indexOf(s.time) >= (retourIdx !== -1 ? retourIdx : 999999));
-
+                          const splitPoint = retourIdx !== -1 ? retourIdx : 999999;
                           const transport = propositionVide();
-                          if (allerStops.length >= 2) {
-                            const segs = createSegments(allerStops);
-                            transport.aller = {
-                              ...transport.aller,
-                              segments: segs,
-                              date: cleanDate,
-                              depart: segs[0].depart,
-                              arrivee: segs[segs.length-1].arrivee,
-                              lieuDepart: segs[0].lieuDepart,
-                              lieuArrivee: segs[segs.length-1].lieuArrivee,
-                              numero: segs[0].numero,
-                              correspondanceLieu: segs.length > 1 ? segs[0].lieuArrivee : ""
-                            };
+                          
+                          const allerStops = deduped.filter(s => rawText.indexOf(s.time) < splitPoint);
+                          const retourStops = deduped.filter(s => rawText.indexOf(s.time) >= splitPoint);
+
+                          const resAller = createTransportDetails(allerStops);
+                          const resRetour = createTransportDetails(retourStops);
+
+                          // Intelligence croisée : si l'aller n'a qu'une gare (départ) 
+                          // et le retour en a une (qui est l'arrivée de l'aller), on complète.
+                          if (!resAller && allerStops.length === 1 && retourStops.length >= 1) {
+                             const inferedAller = [...allerStops, { time: "", name: retourStops[0].name }];
+                             const details = createTransportDetails(inferedAller);
+                             if (details) transport.aller = { ...transport.aller, ...details };
+                          } else if (resAller) {
+                             transport.aller = { ...transport.aller, ...resAller };
                           }
-                          if (retourStops.length >= 2) {
-                            const segs = createSegments(retourStops);
-                            transport.retour = {
-                              ...transport.retour,
-                              segments: segs,
-                              date: cleanDate,
-                              depart: segs[0].depart,
-                              arrivee: segs[segs.length-1].arrivee,
-                              lieuDepart: segs[0].lieuDepart,
-                              lieuArrivee: segs[segs.length-1].lieuArrivee,
-                              numero: segs[0].numero,
-                              correspondanceLieu: segs.length > 1 ? segs[0].lieuArrivee : ""
-                            };
-                          }
+                          
+                          if (resRetour) transport.retour = { ...transport.retour, ...resRetour };
+                          
                           return transport;
                         };
 
@@ -1873,144 +1906,224 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2">
-                          <div className="flex items-center gap-2 pl-2">
-                             <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</div>
-                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Train 1 : Aller</label>
-                          </div>
-                          <div className="space-y-1 bg-blue-50/50 p-3 rounded-xl border border-blue-100 shadow-sm group hover:border-blue-300 transition-all">
-                            <div className="flex gap-2 items-center">
-                              <input type="text" placeholder="Départ" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
-                              <input type="time" className="bg-white border border-blue-100 rounded px-1 text-[11px] font-black w-16" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
-                              <span className="text-blue-300 font-bold">→</span>
-                              <input type="text" placeholder="Arrivée Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-blue-600" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
-                              <input type="time" className="bg-white border border-blue-100 rounded px-1 text-[11px] font-black w-14 text-blue-600" value={prop.aller.correspondanceLieu ? prop.aller.correspondanceArrivee : prop.aller.arrivee} 
-                                onChange={e => updateTransport(idx, 'aller', prop.aller.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} 
-                              />
-                            </div>
-                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-blue-100/50">
-                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
-                                <option value="TRAIN">🚆</option>
-                                <option value="FLIGHT">✈️</option>
-                              </select>
-                              <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-500" value={prop.aller.date || ''} onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} />
-                              <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
-                              <input type="text" placeholder="Durée" className="w-16 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.duree || ''} onChange={e => updateTransport(idx, 'aller', 'duree', e.target.value)} />
-                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.aller.classe || '2de classe'} onChange={e => updateTransport(idx, 'aller', 'classe', e.target.value)}>
-                                <option value="1ère classe">1ère</option>
-                                <option value="2de classe">2de</option>
-                              </select>
-                              <input type="text" placeholder="Placement" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.placement || ''} onChange={e => updateTransport(idx, 'aller', 'placement', e.target.value)} />
-                            </div>
-                          </div>
+                         <div className="grid grid-cols-1 gap-4">
+                           {/* Segment 1 : Aller */}
+                           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-blue-100 dark:border-blue-900/50 p-6 shadow-sm hover:shadow-md transition-all group">
+                             <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-blue-200">1</div>
+                                  <label className="text-[11px] font-black text-blue-600 uppercase tracking-[0.15em]">Aller Principal</label>
+                                </div>
+                             </div>
 
-                          <div className="flex items-center gap-2 pl-2 mt-2">
-                             <div className="w-5 h-5 bg-blue-400 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</div>
-                             <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Train 2 : Correspondance</label>
-                          </div>
-                          <div className="space-y-1 bg-blue-50/20 p-3 rounded-xl border border-blue-50 shadow-sm group hover:border-blue-200 transition-all">
-                            <div className="flex gap-2 items-center">
-                              <input type="text" placeholder="Départ Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-blue-600" value={prop.aller.correspondanceLieu || ''} 
-                                onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} 
-                              />
-                              <input type="time" className="bg-white border border-blue-50 rounded px-1 text-[11px] font-black w-16 text-blue-600" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
-                              <span className="text-blue-300 font-bold">→</span>
-                              <input type="text" placeholder="Arrivée Finale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
-                              <input type="time" className="bg-white border border-blue-50 rounded px-1 text-[11px] font-black w-14" value={prop.aller.arrivee || ''} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
-                            </div>
-                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-blue-50/50">
-                               <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-400" value={prop.aller.correspondanceDate || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} />
-                               <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
-                               <input type="text" placeholder="Temps Escale" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200" value={prop.aller.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDuree', e.target.value)} />
-                            </div>
-                          </div>
-                        </div>
+                             <div className="space-y-3">
+                               {/* Ligne 1 : Les Gares et Horaires */}
+                               <div className="flex items-center gap-4 bg-blue-50/30 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-50/50 dark:border-blue-900/20">
+                                 <input type="text" placeholder="Gare de départ" className="flex-1 bg-transparent border-none p-1 text-sm font-black text-gray-900 dark:text-gray-100 focus:ring-0 placeholder:text-gray-300" value={prop.aller.lieuDepart} onChange={e => updateTransport(idx, 'aller', 'lieuDepart', e.target.value)} />
+                                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-blue-100 dark:border-blue-900/40 shadow-sm group-hover:border-blue-300 transition-colors">
+                                   <Clock className="w-3 h-3 text-blue-400" />
+                                   <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-blue-600 w-16 focus:ring-0" value={prop.aller.depart} onChange={e => updateTransport(idx, 'aller', 'depart', e.target.value)} />
+                                 </div>
+                                 <ArrowRight className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                                 <input type="text" placeholder={prop.aller.correspondanceLieu ? "Ville d'escale" : "Gare d'arrivée"} className="flex-1 bg-transparent border-none p-1 text-sm font-black text-blue-600 focus:ring-0 placeholder:text-blue-200" value={prop.aller.correspondanceLieu || prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', prop.aller.correspondanceLieu ? 'correspondanceLieu' : 'lieuArrivee', e.target.value)} />
+                                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-blue-100 dark:border-blue-900/40 shadow-sm group-hover:border-blue-300 transition-colors">
+                                   <Clock className="w-3 h-3 text-blue-400" />
+                                   <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-blue-600 w-16 focus:ring-0" value={prop.aller.correspondanceLieu ? (prop.aller.correspondanceArrivee || '') : (prop.aller.arrivee || '')} onChange={e => updateTransport(idx, 'aller', prop.aller.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} />
+                                 </div>
+                               </div>
 
-                      </div>
+                               {/* Ligne 2 : Détails Techniques */}
+                               <div className="flex items-center gap-6 px-4 py-1">
+                                 <div className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 dark:border-slate-800 pr-4">
+                                   <select className="bg-transparent border-none p-0 cursor-pointer hover:scale-110 transition-transform text-sm" value={prop.aller.type} onChange={e => updateTransport(idx, 'aller', 'type', e.target.value as any)}>
+                                     <option value="TRAIN">🚆</option>
+                                     <option value="FLIGHT">✈️</option>
+                                   </select>
+                                   <input 
+                                     type="text" 
+                                     placeholder="Date (ex: 24/03)" 
+                                     className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-2 py-1 w-32 text-xs font-black text-blue-700 dark:text-blue-300 outline-none focus:ring-2 focus:ring-blue-500/20" 
+                                     value={prop.aller.date || ''} 
+                                     onChange={e => updateTransport(idx, 'aller', 'date', e.target.value)} 
+                                   />
+                                 </div>
+                                 <div className="flex items-center gap-4 flex-1">
+                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
+                                      <Train className="w-3 h-3 text-gray-300" />
+                                      <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
+                                      <Users className="w-3 h-3 text-gray-300" />
+                                      <input type="text" placeholder="PLACEMENT (VOITURE 4, PLACE 52...)" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 flex-1 focus:ring-0" value={prop.aller.placement || ''} onChange={e => updateTransport(idx, 'aller', 'placement', e.target.value)} />
+                                    </div>
+                                 </div>
+                               </div>
+                             </div>
 
+                             {prop.aller.correspondanceLieu && (
+                               <div className="mt-8 pt-6 border-t border-gray-50 dark:border-gray-800 border-dashed">
+                                  <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-6 h-6 bg-blue-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-blue-100 dark:shadow-none">2</div>
+                                    <label className="text-[11px] font-black text-blue-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                  </div>
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-4 bg-blue-50/10 dark:bg-blue-900/5 p-4 rounded-2xl border border-blue-50/30 dark:border-blue-900/10">
+                                      <div className="flex-1 flex flex-col">
+                                        <label className="text-[8px] font-bold text-blue-400 uppercase ml-1 mb-1">Escale</label>
+                                        <input type="text" placeholder="Ville d'escale" className="bg-transparent border-none p-1 text-sm font-black text-blue-600 focus:ring-0 placeholder:text-blue-200 h-6" value={prop.aller.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceLieu', e.target.value)} />
+                                      </div>
+                                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-blue-100 dark:border-blue-900/40 shadow-sm">
+                                        <div className="flex flex-col">
+                                          <label className="text-[8px] font-bold text-blue-300 uppercase leading-none mb-1">Départ</label>
+                                          <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-blue-600 w-16 focus:ring-0" value={prop.aller.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceHeure', e.target.value)} />
+                                        </div>
+                                      </div>
+                                      <ArrowRight className="w-4 h-4 text-blue-100 flex-shrink-0" />
+                                      <div className="flex-1 flex flex-col">
+                                        <label className="text-[8px] font-bold text-gray-400 uppercase ml-1 mb-1">Arrivée Finale</label>
+                                        <input type="text" placeholder="Destination finale" className="bg-transparent border-none p-1 text-sm font-black text-gray-900 dark:text-gray-100 focus:ring-0" value={prop.aller.lieuArrivee} onChange={e => updateTransport(idx, 'aller', 'lieuArrivee', e.target.value)} />
+                                      </div>
+                                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-blue-100 dark:border-blue-900/40 shadow-sm">
+                                        <div className="flex flex-col">
+                                          <label className="text-[8px] font-bold text-gray-400 uppercase leading-none mb-1">Arrivée</label>
+                                          <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-gray-900 dark:text-gray-100 w-16 focus:ring-0" value={prop.aller.arrivee || ''} onChange={e => updateTransport(idx, 'aller', 'arrivee', e.target.value)} />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-6 px-4 py-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder="Date" 
+                                        className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-2 py-1 w-32 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 outline-none focus:ring-2 focus:ring-blue-500/20" 
+                                        value={prop.aller.correspondanceDate || ''} 
+                                        onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} 
+                                      />
+                                      <input type="text" placeholder="N° TRAIN 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
+                                      <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-950/20 px-2 py-1 rounded-lg">
+                                        <Clock className="w-2.5 h-2.5 text-orange-400" />
+                                        <input type="text" placeholder="ESCALE" className="bg-transparent border-none p-0 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200 w-16 focus:ring-0" value={prop.aller.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDuree', e.target.value)} />
+                                      </div>
+                                    </div>
+                                  </div>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       </div>
 
-                      {/* Retour */}
-                      <div className="space-y-4 pt-6 mt-6 border-t border-orange-100">
-                        <div className="flex justify-between items-center not-italic">
-                          <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                             <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" /> Retour (vers domicile)
+                       {/* Retour */}
+                       <div className="space-y-4 pt-10 mt-10 border-t border-orange-100 dark:border-orange-900/30">
+                        <div className="flex justify-between items-center not-italic bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-3xl border border-orange-100/50 dark:border-orange-900/20 mb-6">
+                          <p className="text-[11px] font-black text-orange-600 uppercase tracking-[0.2em] flex items-center gap-3">
+                             <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" /> Retour domicile
                           </p>
-                          <div className="flex gap-2 mr-24">
-                            <button
-                              onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
-                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
-                            >
-                              <Plane className="w-2.5 h-2.5" /> Vols
-                            </button>
-                            <button
-                              onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
-                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
-                            >
-                              <Train className="w-2.5 h-2.5" /> Train (SNCF)
-                            </button>
-                            <button
-                              onClick={() => selectedCongres && openTrainline(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)}
-                              className="p-1 px-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-[8px] font-black uppercase"
-                            >
-                              <Train className="w-2.5 h-2.5" /> Trainline
-                            </button>
+                          <div className="flex gap-2">
+                             {/* Boutons existants pour Google Flights/SNCF */}
+                             <button onClick={() => selectedCongres && openGoogleFlights(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)} className="p-1 px-3 bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-900/40 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition-all shadow-sm text-[9px] font-black uppercase">✈️ Vols</button>
+                             <button onClick={() => selectedCongres && openSNCF(selectedCongres.lieu || selectedCongres.nom, currentParticipant.villeDepart, prop.retour.date || selectedCongres.dateFin || selectedCongres.date, undefined, undefined, selectedCongres.id, currentParticipant.id)} className="p-1 px-3 bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-900/40 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition-all shadow-sm text-[9px] font-black uppercase">🚆 Train</button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 not-italic">
-                          <div className="flex items-center gap-2 pl-2">
-                             <div className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</div>
-                             <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Train 1 : Retour</label>
-                          </div>
-                          <div className="space-y-1 bg-orange-50/50 p-3 rounded-xl border border-orange-100 shadow-sm group hover:border-orange-300 transition-all">
-                            <div className="flex gap-2 items-center">
-                              <input type="text" placeholder="Départ" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
-                              <input type="time" className="bg-white border border-orange-100 rounded px-1 text-[11px] font-black w-16" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
-                              <span className="text-orange-300 font-bold">→</span>
-                              <input type="text" placeholder="Arrivée Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-orange-600" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
-                              <input type="time" className="bg-white border border-orange-100 rounded px-1 text-[11px] font-black w-14 text-orange-600" value={prop.retour.correspondanceLieu ? prop.retour.correspondanceArrivee : prop.retour.arrivee} 
-                                onChange={e => updateTransport(idx, 'retour', prop.retour.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} 
-                              />
-                            </div>
-                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-orange-100/50">
-                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
-                                <option value="TRAIN">🚆</option>
-                                <option value="FLIGHT">✈️</option>
-                              </select>
-                              <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-500" value={prop.retour.date || ''} onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} />
-                              <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
-                              <input type="text" placeholder="Durée" className="w-16 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.duree || ''} onChange={e => updateTransport(idx, 'retour', 'duree', e.target.value)} />
-                              <select className="bg-transparent border-none text-[9px] font-black uppercase tracking-widest cursor-pointer text-gray-400" value={prop.retour.classe || '2de classe'} onChange={e => updateTransport(idx, 'retour', 'classe', e.target.value)}>
-                                <option value="1ère classe">1ère</option>
-                                <option value="2de classe">2de</option>
-                              </select>
-                              <input type="text" placeholder="Placement" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.placement || ''} onChange={e => updateTransport(idx, 'retour', 'placement', e.target.value)} />
-                            </div>
-                          </div>
+                        <div className="grid grid-cols-1 gap-4 not-italic">
+                           {/* Segment 1 : Retour */}
+                           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-orange-100 dark:border-orange-900/50 p-6 shadow-sm hover:shadow-md transition-all group">
+                             <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-orange-200">1</div>
+                                  <label className="text-[11px] font-black text-orange-500 uppercase tracking-[0.15em]">Retour Principal</label>
+                                </div>
+                             </div>
 
-                          <div className="flex items-center gap-2 pl-2 mt-2">
-                             <div className="w-5 h-5 bg-orange-400 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</div>
-                             <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Train 2 : Correspondance</label>
-                          </div>
-                          <div className="space-y-1 bg-orange-50/20 p-3 rounded-xl border border-orange-50 shadow-sm group hover:border-orange-200 transition-all">
-                            <div className="flex gap-2 items-center">
-                              <input type="text" placeholder="Départ Escale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0 text-orange-600" value={prop.retour.correspondanceLieu || ''} 
-                                onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} 
-                              />
-                              <input type="time" className="bg-white border border-orange-50 rounded px-1 text-[11px] font-black w-16 text-orange-600" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
-                              <span className="text-orange-300 font-bold">→</span>
-                              <input type="text" placeholder="Arrivée Finale" className="flex-1 bg-transparent border-none p-1 text-xs font-bold focus:ring-0" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
-                              <input type="time" className="bg-white border border-orange-50 rounded px-1 text-[11px] font-black w-14" value={prop.retour.arrivee || ''} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
-                            </div>
-                            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-orange-50/50">
-                               <input type="date" className="bg-transparent border-none p-1 text-[9px] font-black uppercase w-28 text-gray-400" value={prop.retour.correspondanceDate || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} />
-                               <input type="text" placeholder="N° de train" className="flex-1 bg-transparent border-none p-1 text-[9px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
-                               <input type="text" placeholder="Temps Escale" className="w-20 bg-transparent border-none p-1 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200" value={prop.retour.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceDuree', e.target.value)} />
-                            </div>
-                          </div>
-                        </div>
+                             <div className="space-y-3">
+                               <div className="flex items-center gap-4 bg-orange-50/30 dark:bg-orange-900/10 p-4 rounded-2xl border border-orange-50/50 dark:border-orange-900/20">
+                                 <input type="text" placeholder="Départ" className="flex-1 bg-transparent border-none p-1 text-sm font-black text-gray-900 dark:text-gray-100 focus:ring-0 placeholder:text-gray-300" value={prop.retour.lieuDepart} onChange={e => updateTransport(idx, 'retour', 'lieuDepart', e.target.value)} />
+                                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-orange-100 dark:border-orange-900/40 shadow-sm">
+                                   <Clock className="w-3 h-3 text-orange-400" />
+                                   <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-orange-600 w-16 focus:ring-0" value={prop.retour.depart} onChange={e => updateTransport(idx, 'retour', 'depart', e.target.value)} />
+                                 </div>
+                                 <ArrowRight className="w-4 h-4 text-orange-300 flex-shrink-0" />
+                                 <input type="text" placeholder={prop.retour.correspondanceLieu ? "Ville d'escale" : "Destination"} className="flex-1 bg-transparent border-none p-1 text-sm font-black text-orange-600 focus:ring-0 placeholder:text-orange-200" value={prop.retour.correspondanceLieu || prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', prop.retour.correspondanceLieu ? 'correspondanceLieu' : 'lieuArrivee', e.target.value)} />
+                                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-orange-100 dark:border-orange-900/40 shadow-sm">
+                                   <Clock className="w-3 h-3 text-orange-400" />
+                                   <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-orange-600 w-16 focus:ring-0" value={prop.retour.correspondanceLieu ? (prop.retour.correspondanceArrivee || '') : (prop.retour.arrivee || '')} onChange={e => updateTransport(idx, 'retour', prop.retour.correspondanceLieu ? 'correspondanceArrivee' : 'arrivee', e.target.value)} />
+                                 </div>
+                               </div>
 
-                      </div>
+                               <div className="flex items-center gap-6 px-4 py-1">
+                                 <div className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 dark:border-slate-800 pr-4">
+                                   <select className="bg-transparent border-none p-0 cursor-pointer hover:scale-110 transition-transform text-sm" value={prop.retour.type} onChange={e => updateTransport(idx, 'retour', 'type', e.target.value as any)}>
+                                     <option value="TRAIN">🚆</option>
+                                     <option value="FLIGHT">✈️</option>
+                                   </select>
+                                   <input 
+                                     type="text" 
+                                     placeholder="Date (ex: 24/03)" 
+                                     className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2 py-1 w-32 text-xs font-black text-orange-700 dark:text-orange-300 outline-none focus:ring-2 focus:ring-orange-500/20" 
+                                     value={prop.retour.date || ''} 
+                                     onChange={e => updateTransport(idx, 'retour', 'date', e.target.value)} 
+                                   />
+                                 </div>
+                                 <div className="flex items-center gap-4 flex-1">
+                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
+                                      <Train className="w-3 h-3 text-gray-300" />
+                                      <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
+                                      <Users className="w-3 h-3 text-gray-300" />
+                                      <input type="text" placeholder="PLACEMENT" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 flex-1 focus:ring-0" value={prop.retour.placement || ''} onChange={e => updateTransport(idx, 'retour', 'placement', e.target.value)} />
+                                    </div>
+                                 </div>
+                               </div>
+                             </div>
+
+                             {prop.retour.correspondanceLieu && (
+                               <div className="mt-8 pt-6 border-t border-gray-50 dark:border-gray-800 border-dashed">
+                                  <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-6 h-6 bg-orange-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-orange-100">2</div>
+                                    <label className="text-[11px] font-black text-orange-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                  </div>
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-4 bg-orange-50/10 dark:bg-orange-900/5 p-4 rounded-2xl border border-orange-50/30 dark:border-orange-900/10">
+                                      <div className="flex-1 flex flex-col">
+                                        <label className="text-[8px] font-bold text-orange-400 uppercase ml-1 mb-1">Escale</label>
+                                        <input type="text" placeholder="Ville d'escale" className="bg-transparent border-none p-1 text-sm font-black text-orange-600 focus:ring-0 placeholder:text-blue-200 h-6" value={prop.retour.correspondanceLieu || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceLieu', e.target.value)} />
+                                      </div>
+                                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-orange-100 dark:border-orange-900/40 shadow-sm">
+                                        <div className="flex flex-col">
+                                          <label className="text-[8px] font-bold text-orange-300 uppercase leading-none mb-1">Départ</label>
+                                          <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-orange-600 w-16 focus:ring-0" value={prop.retour.correspondanceHeure || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceHeure', e.target.value)} />
+                                        </div>
+                                      </div>
+                                      <ArrowRight className="w-4 h-4 text-orange-100 flex-shrink-0" />
+                                      <input type="text" placeholder="Arrivée Finale" className="flex-1 bg-transparent border-none p-1 text-sm font-black text-gray-900 dark:text-gray-100 focus:ring-0" value={prop.retour.lieuArrivee} onChange={e => updateTransport(idx, 'retour', 'lieuArrivee', e.target.value)} />
+                                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-orange-100 dark:border-orange-900/40 shadow-sm">
+                                        <Clock className="w-3 h-3 text-orange-300" />
+                                        <input type="time" className="bg-transparent border-none p-0 text-sm font-black text-gray-900 dark:text-gray-100 w-16 focus:ring-0" value={prop.retour.arrivee || ''} onChange={e => updateTransport(idx, 'retour', 'arrivee', e.target.value)} />
+                                      </div>
+                                    </div>
+                                    {/* Row 2 : Détails Techniques (Date, Numéro...) */}
+                                    <div className="flex items-center gap-6 px-4 py-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder="Date" 
+                                        className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2 py-1 w-32 text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 outline-none focus:ring-2 focus:ring-orange-500/20" 
+                                        value={prop.retour.correspondanceDate || ''} 
+                                        onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} 
+                                      />
+                                      <input type="text" placeholder="N° TRAIN 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
+                                      {prop.retour.correspondanceDuree && (
+                                        <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-950/20 px-2 py-1 rounded-lg">
+                                          <Clock className="w-2.5 h-2.5 text-orange-400" />
+                                          <p className="text-[9px] font-black uppercase text-orange-400">{prop.retour.correspondanceDuree}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       </div>
                     </div>
                   ))}
                 </div>

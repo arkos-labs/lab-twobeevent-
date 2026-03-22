@@ -75,38 +75,35 @@ export async function POST(req: Request) {
                 date: t?.date || parseDateLabel(t?.dateLabel) || t?.dateLabel || '',
                 depart: t?.depart || t?.departureTime || '',
                 arrivee: t?.arrivee || t?.arrivalTime || '',
-                lieuDepart: t?.lieuDepart || t?.depart || t?.departure || '',
-                lieuArrivee: t?.lieuArrivee || t?.arrivee || t?.arrival || '',
+                lieuDepart: t?.lieuDepart || t?.departure || '',
+                lieuArrivee: t?.lieuArrivee || t?.arrival || '',
                 correspondanceLieu: t?.correspondanceLieu || '',
                 correspondanceHeure: t?.correspondanceHeure || '',
                 correspondanceArrivee: t?.correspondanceArrivee || '',
-                correspondanceNumero: t?.correspondanceNumero || ''
+                correspondanceNumero: t?.correspondanceNumero || '',
+                segments: t?.segments || []
             });
 
-            const applyCorrespondance = (trajet: Trajet, segments: any[] = []) => {
-                if (!trajet) return trajet;
+            const applyCorrespondance = (trajet: Trajet) => {
+                if (!trajet || !Array.isArray(trajet.segments) || trajet.segments.length <= 1) return trajet;
                 
-                // Si on a des segments détaillés, on les utilise pour enrichir le trajet
-                if (Array.isArray(segments) && segments.length > 1) {
-                    const firstLeg = segments[0];
-                    const secondLeg = segments[1];
-                    
-                    // On ne remplit que si les champs sont vides ou si on veut forcer la précision des segments
-                    if (!trajet.correspondanceLieu) trajet.correspondanceLieu = firstLeg?.lieuArrivee || '';
-                    if (!trajet.correspondanceArrivee) trajet.correspondanceArrivee = firstLeg?.arrivee || '';
-                    if (!trajet.correspondanceHeure) trajet.correspondanceHeure = secondLeg?.depart || '';
-                    if (!trajet.correspondanceNumero) trajet.correspondanceNumero = secondLeg?.numero || '';
-                    if (!trajet.correspondanceDate) trajet.correspondanceDate = trajet.date || '';
-                }
+                const firstLeg = trajet.segments[0];
+                const secondLeg = trajet.segments[1];
+                
+                // On remplit les infos de correspondance à partir des segments si elles manquent
+                if (!trajet.correspondanceLieu) trajet.correspondanceLieu = firstLeg?.lieuArrivee || '';
+                if (!trajet.correspondanceArrivee) trajet.correspondanceArrivee = firstLeg?.arrivee || '';
+                if (!trajet.correspondanceHeure) trajet.correspondanceHeure = secondLeg?.depart || '';
+                if (!trajet.correspondanceNumero) trajet.correspondanceNumero = secondLeg?.numero || '';
+                if (!trajet.correspondanceDate) trajet.correspondanceDate = trajet.date || '';
+                
                 return trajet;
             };
 
-
-
             // Si l'extension envoie déjà un objet avec aller/retour
             if (transport.aller || transport.retour) {
-                const aller = applyCorrespondance(mapTrajet(transport.aller), transport.segmentsAller);
-                const retour = applyCorrespondance(mapTrajet(transport.retour), transport.segmentsRetour);
+                const aller = applyCorrespondance(mapTrajet(transport.aller));
+                const retour = applyCorrespondance(mapTrajet(transport.retour));
                 const transportToAdd: PropositionTransport = { aller, retour };
                 newTransports.push(transportToAdd);
             } else {

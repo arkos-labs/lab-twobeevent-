@@ -23,10 +23,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (response) {
                 if (response.hotel) hotelData = response.hotel;
                 if (response.transport) {
-                    if (response.transport.isReturn) {
-                        transportData.retour = response.transport;
-                    } else {
-                        transportData.aller = response.transport;
+                    if (response.transport.aller) transportData.aller = response.transport.aller;
+                    if (response.transport.retour) transportData.retour = response.transport.retour;
+                    // Compatibilité avec les sites qui envoient encore le format à plat
+                    if (response.transport.isReturn !== undefined) {
+                      if (response.transport.isReturn) transportData.retour = response.transport;
+                      else transportData.aller = response.transport;
                     }
                 }
                 if (response.participantId) {
@@ -90,16 +92,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         segmentsContainer.innerHTML = "";
         
         const renderSection = (title, data, key) => {
-            if (!data || !data.segments || data.segments.length === 0) return;
+            if (!data) return;
+            
+            // Si pas de segments, on crée un segment virtuel depuis les champs top-level
+            const segsToShow = (data.segments && data.segments.length > 0)
+                ? data.segments
+                : [{
+                    depart: data.depart || "",
+                    arrivee: data.arrivee || "",
+                    lieuDepart: data.lieuDepart || "",
+                    lieuArrivee: data.lieuArrivee || "",
+                    numero: data.numero || ""
+                  }];
+
+            if (!segsToShow[0].lieuDepart && !segsToShow[0].depart) return;
             
             const titleEl = document.createElement('div');
             titleEl.className = 'section-title';
             titleEl.innerText = title;
             segmentsContainer.appendChild(titleEl);
             
-            data.segments.forEach((seg, idx) => {
+            segsToShow.forEach((seg, idx) => {
                 segmentsContainer.appendChild(createSegmentRow(seg, key, idx));
             });
+
+            // Ajouter le champ Notes (Correspondance)
+            const notesLabel = document.createElement('div');
+            notesLabel.className = 'label-small';
+            notesLabel.innerText = "Notes / Correspondance";
+            segmentsContainer.appendChild(notesLabel);
+
+            const notesInput = document.createElement('textarea');
+            notesInput.className = 'notes-area';
+            notesInput.placeholder = "Résumé des escales...";
+            notesInput.value = data.correspondanceLieu || "";
+            notesInput.addEventListener('input', (e) => {
+                transportData[key].correspondanceLieu = e.target.value;
+                saveData();
+            });
+            segmentsContainer.appendChild(notesInput);
         };
 
         renderSection('🔵 Aller', transportData.aller, 'aller');
