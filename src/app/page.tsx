@@ -1297,55 +1297,82 @@ export default function Dashboard() {
                                   {/* Aller */}
                                   {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].aller ? (
                                     <div className="flex items-start gap-2">
-                                      <div className="mt-0.5 text-blue-500">
-                                        {p.logistique.transports[0].aller.type === 'TRAIN' ? <Train className="w-3.5 h-3.5" /> : <Plane className="w-3.5 h-3.5" />}
+                                      <div className="mt-1 text-blue-500">
+                                        {p.logistique.transports[0].aller.type === 'TRAIN' ? <Train className="w-4 h-4" /> : <Plane className="w-4 h-4" />}
                                       </div>
                                       <div className="flex-1 text-xs">
-                                        <p className="font-bold text-gray-800">{p.logistique.transports[0].aller.lieuDepart || '?'} → {p.logistique.transports[0].aller.lieuArrivee || '?'}</p>
-                                        <p className="text-[10px] text-gray-500">
-                                          {p.logistique.transports[0].aller.date && <>{p.logistique.transports[0].aller.date} • </>}
-                                          {p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}
-                                        </p>
-                                        {p.logistique.transports[0].aller.correspondanceLieu && (
-                                           <div className="mt-1 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50">
-                                              <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter mb-0.5">Escale</p>
-                                              <div className="flex justify-between items-center">
-                                                <p className="text-[10px] text-blue-700 font-bold">
-                                                  {p.logistique.transports[0].aller.correspondanceLieu}
-                                                  {p.logistique.transports[0].aller.correspondanceNumero ? ` • N° ${p.logistique.transports[0].aller.correspondanceNumero}` : ''}
-                                                </p>
+                                        <div className="space-y-0.5">
+                                          <p className="font-bold text-gray-900 leading-tight">
+                                            {p.logistique.transports[0].aller.lieuDepart || '?'} → {p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee || '?'}
+                                          </p>
+                                          
+                                          {p.logistique.transports[0].aller.correspondanceLieu && (
+                                            <>
+                                              <div className="ml-1.5 py-1 border-l-2 border-dashed border-blue-100 pl-3 my-0.5">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-[9px] font-black text-blue-500 uppercase bg-blue-50 px-1.5 py-0.5 rounded">Escale: {p.logistique.transports[0].aller.correspondanceLieu}</span>
+                                                  <span className="text-[9px] text-gray-400 font-medium">{p.logistique.transports[0].aller.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].aller.correspondanceHeure || '--:--'}</span>
+                                                </div>
+                                                {p.logistique.transports[0].aller.correspondanceNumero && (
+                                                  <p className="text-[8px] text-gray-400 mt-0.5 italic">Changement pour n° {p.logistique.transports[0].aller.correspondanceNumero}</p>
+                                                )}
                                               </div>
-                                              <p className="text-[9px] text-blue-500 font-medium">
-                                                {p.logistique.transports[0].aller.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].aller.correspondanceHeure || '--:--'}
+                                              <p className="font-bold text-gray-900 leading-tight">
+                                                {p.logistique.transports[0].aller.correspondanceLieu} → {p.logistique.transports[0].aller.lieuArrivee || '?'}
                                               </p>
-                                           </div>
-                                         )}
+                                            </>
+                                          )}
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2 mt-1.5 opacity-60">
+                                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{p.logistique.transports[0].aller.date || '---'}</span>
+                                           <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                                           <span className="text-[9px] font-bold text-blue-600">{p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}</span>
+                                           <span className="text-[8px] text-gray-400">({p.logistique.transports[0].aller.numero})</span>
+                                        </div>
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="text-xs text-gray-400 italic">Transport Aller non défini</div>
+                                    <div className="text-xs text-gray-300 italic">Transport Aller non défini</div>
                                   )}
+
                                   {/* Retour */}
                                   {p.logistique.transports && p.logistique.transports[0] && p.logistique.transports[0].retour ? (
-                                    <div className="flex items-start gap-2">
-                                      <div className="mt-0.5 text-orange-400">
-                                        {p.logistique.transports[0].retour.type === 'TRAIN' ? <Train className="w-3.5 h-3.5" /> : <Plane className="w-3.5 h-3.5" />}
+                                    <div className="flex items-start gap-2 mt-4 pt-4 border-t border-gray-50">
+                                      <div className="mt-1 text-orange-400">
+                                        {p.logistique.transports[0].retour.type === 'TRAIN' ? <Train className="w-4 h-4" /> : <Plane className="w-4 h-4" />}
                                       </div>
                                       <div className="flex-1 text-xs">
-                                        <p className="font-bold text-gray-800">{p.logistique.transports[0].retour.lieuDepart || '?'} → {p.logistique.transports[0].retour.lieuArrivee || '?'}</p>
-                                        <p className="text-[10px] text-gray-500">
-                                          {p.logistique.transports[0].retour.date && <>{p.logistique.transports[0].retour.date} • </>}
-                                          {p.logistique.transports[0].retour.depart || '--:--'} à {p.logistique.transports[0].retour.arrivee || '--:--'}
-                                        </p>
-                                        {p.logistique.transports[0].retour.correspondanceLieu && (
-                                          <p className="text-[10px] text-orange-500">
-                                            Correspondance: {p.logistique.transports[0].retour.correspondanceLieu}
-                                            {p.logistique.transports[0].retour.correspondanceHeure ? ` (${p.logistique.transports[0].retour.correspondanceHeure})` : ''}
+                                        <div className="space-y-0.5">
+                                          <p className="font-bold text-gray-900 leading-tight">
+                                            {p.logistique.transports[0].retour.lieuDepart || '?'} → {p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee || '?'}
                                           </p>
-                                        )}
+
+                                          {p.logistique.transports[0].retour.correspondanceLieu && (
+                                            <>
+                                              <div className="ml-1.5 py-1 border-l-2 border-dashed border-orange-100 pl-3 my-0.5">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-[9px] font-black text-orange-500 uppercase bg-orange-50 px-1.5 py-0.5 rounded">Escale: {p.logistique.transports[0].retour.correspondanceLieu}</span>
+                                                  <span className="text-[9px] text-gray-400 font-medium">{p.logistique.transports[0].retour.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].retour.correspondanceHeure || '--:--'}</span>
+                                                </div>
+                                              </div>
+                                              <p className="font-bold text-gray-900 leading-tight">
+                                                {p.logistique.retour.correspondanceLieu} → {p.logistique.retour.lieuArrivee || '?'}
+                                              </p>
+                                            </>
+                                          )}
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2 mt-1.5 opacity-60">
+                                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{p.logistique.transports[0].retour.date || '---'}</span>
+                                           <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                                           <span className="text-[9px] font-bold text-orange-600">{p.logistique.transports[0].retour.depart || '--:--'} à {p.logistique.transports[0].retour.arrivee || '--:--'}</span>
+                                           <span className="text-[8px] text-gray-400">({p.logistique.transports[0].retour.numero})</span>
+                                        </div>
                                       </div>
                                     </div>
                                   ) : null}
+
                                   {/* Hotel */}
                                   {p.logistique.hotels && p.logistique.hotels[0]?.nom && (
                                     <div className="flex items-start gap-2">

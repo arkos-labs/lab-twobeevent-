@@ -20,20 +20,27 @@ function extractAllDetails() {
     const tripType = isReturn ? "RETOUR" : "ALLER";
 
     // Extraction des Gares et Horaires
-    // On cherche les éléments qui contiennent au moins un horaire HH:mm
-    const stationBlocks = Array.from(detailPanel.querySelectorAll('div, p, span'))
+    console.log("[Twobeevent] Détection des gares...");
+    const blocks = Array.from(detailPanel.querySelectorAll('div, p, span'))
       .filter(el => {
           const t = el.innerText.trim();
-          // On veut des lignes qui commencent par HH:mm, éventuellement suivies d'un séparateur
-          return /^\d{2}:\d{2}\s*[-•]?\s*.+$/.test(t) && t.length < 100;
+          // Patterns: "HH:mm Station" ou "Station HH:mm"
+          return /^(\d{2}:\d{2})\s*(.+)$/.test(t) || /^(.+)\s*(\d{2}:\d{2})$/.test(t);
       })
-      // On ne garde que les éléments de plus bas niveau qui matchent
       .filter((el, index, self) => !self.some((other, otherIdx) => index !== otherIdx && el.contains(other)));
     
-    const parsedStations = stationBlocks.map(el => {
-      const match = el.innerText.trim().match(/^(\d{2}:\d{2})\s*[-•]?\s*(.+)$/);
-      return match ? { time: match[1], name: match[2].trim() } : null;
+    const parsedStations = blocks.map(el => {
+      const t = el.innerText.trim();
+      let match = t.match(/^(\d{2}:\d{2})\s*[-•]?\s*(.+)$/);
+      if (match) return { time: match[1], name: match[2].trim() };
+      
+      match = t.match(/^(.+)\s*[-•]?\s*(\d{2}:\d{2})$/);
+      if (match) return { time: match[2], name: match[1].trim() };
+      
+      return null;
     }).filter(Boolean);
+    console.log("[Twobeevent] Gares trouvées:", parsedStations);
+
 
 
     // Extraction des trains (ex: TGV INOUI n° 6805)
@@ -59,20 +66,18 @@ function extractAllDetails() {
 
     // Construction de l'objet de transport final
     if (parsedStations.length >= 2) {
-      // Construction des segments pour l'API
+      console.log("[Twobeevent] Construction des segments...");
       const segments = [];
       const step = (parsedStations.length > 2 && parsedStations[1].name === parsedStations[2].name) ? 2 : 1;
       
       for (let i = 0; i < parsedStations.length - 1; i += step) {
-          if (parsedStations[i] && parsedStations[i+1]) {
-              segments.push({
-                  depart: parsedStations[i].time,
-                  arrivee: parsedStations[i+1].time,
-                  lieuDepart: parsedStations[i].name,
-                  lieuArrivee: parsedStations[i+1].name,
-                  numero: trainMatches[segments.length] || ""
-              });
-          }
+          segments.push({
+              depart: parsedStations[i].time,
+              arrivee: parsedStations[i+1].time,
+              lieuDepart: parsedStations[i].name,
+              lieuArrivee: parsedStations[i+1].name,
+              numero: trainMatches[segments.length] || ""
+          });
       }
 
       data.transport = {
@@ -87,14 +92,14 @@ function extractAllDetails() {
         lieuArrivee: parsedStations[parsedStations.length - 1].name,
         duration: totalDuration,
         co2: co2Match ? co2Match[1] : null,
-        date: Array.from(detailPanel.querySelectorAll('p, span')).find(el => el.innerText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\. \d+/))?.innerText || "",
+        date: Array.from(detailPanel.querySelectorAll('p, span')).find(el => el.innerText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\. \d+/i))?.innerText || "",
         correspondanceLieu: layoverInfo ? layoverInfo.location : "",
-        correspondanceNumero: trainMatches.length > 1 ? trainMatches[1] : "", // Fallback
+        correspondanceNumero: trainMatches.length > 1 ? trainMatches[1] : "",
         segments: segments
       };
-
-
+      console.log("[Twobeevent] Extraction réussie:", data.transport);
     }
+
 
     console.log("Scraping SNCF réussi:", data.transport);
 
