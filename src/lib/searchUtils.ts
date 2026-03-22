@@ -1,3 +1,23 @@
+// Variable globale pour le throttling (limite la fréquence d'ouverture)
+let lastRequestTime = 0;
+const MIN_DELAY = 1200; // 1.2 seconde entre deux clics pour paraître humain
+
+function secureOpen(url: string, windowName: string) {
+  const now = Date.now();
+  if (now - lastRequestTime < MIN_DELAY) {
+    console.warn("[Security] Requête trop rapide, blocage préventif.");
+    return;
+  }
+  lastRequestTime = now;
+
+  // Délai aléatoire (Jitter) entre 100 et 600ms pour casser la régularité
+  const randomJitter = Math.floor(Math.random() * 500) + 100;
+  
+  setTimeout(() => {
+    window.open(url, windowName, 'noreferrer');
+  }, randomJitter);
+}
+
 export function openGoogleFlights(
   origin: string,
   destination: string,
@@ -21,7 +41,6 @@ export function openGoogleFlights(
   const dAller = dep ? formatDate(dep) : '';
   const dRetour = ret ? formatDate(ret) : '';
 
-  // L'ajout de "/search" est CRUCIAL pour que Google Flights interprète le paramètre q
   const query = `${from} ${to} ${dAller} ${dRetour}`;
   let url = `https://www.google.com/travel/flights/search?q=${encodeURIComponent(query)}`;
   
@@ -29,7 +48,8 @@ export function openGoogleFlights(
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank', 'noreferrer');
+  // On réutilise l'onglet de recherche de vol pour éviter le spam
+  secureOpen(url, 'twobeevent_flights_search');
 }
 
 // Ouvre Google Hotels pré-rempli avec les filtres demandés (3-4*, max 150€, petit-déjeuner inclus)
@@ -64,7 +84,7 @@ export function openGoogleHotels(
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank', 'noreferrer');
+  secureOpen(url, 'twobeevent_hotels_search');
 }
 
 // Ouvre SNCF Connect pré-rempli (trains)
@@ -93,7 +113,8 @@ export function openSNCF(origin: string, destination: string, date: string, date
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank', 'noreferrer');
+  // La SNCF est très sensible : on réutilise STRICTEMENT le même onglet
+  secureOpen(url, 'twobeevent_sncf_search');
 }
 
 // Ouvre Trainline pré-rempli (alternative à SNCF Connect)
@@ -130,5 +151,5 @@ export function openTrainline(
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
 
-  window.open(url, '_blank', 'noreferrer');
+  secureOpen(url, 'twobeevent_trainline_search');
 }
