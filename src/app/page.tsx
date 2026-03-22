@@ -1332,33 +1332,53 @@ export default function Dashboard() {
                                           </div>
 
                                           <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-blue-100 dark:before:bg-blue-900/40">
-                                            {/* Train 1 / Segment 1 */}
-                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                              <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                 <span>{p.logistique.transports[0].aller.lieuDepart}</span>
-                                                 <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
-                                              </div>
-                                              <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.date}</span>
-                                                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].aller.depart}</span>
-                                                <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].aller.numero || 'TRAIN'}</span>
-                                              </div>
-                                            </div>
+                                            {/* Nouveau : On mappe TOUS les segments s'ils existent */}
+                                            {p.logistique.transports[0].aller.segments && p.logistique.transports[0].aller.segments.length > 0 ? (
+                                              p.logistique.transports[0].aller.segments.map((seg, idx) => (
+                                                <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                     <span>{seg.lieuDepart}</span>
+                                                     <ArrowRight className="w-4 h-4 text-blue-400" />
+                                                     <span>{seg.lieuArrivee}</span>
+                                                  </div>
+                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {seg.date || p.logistique.transports[0].aller.date}</span>
+                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {seg.depart}</span>
+                                                    <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {seg.numero || 'TRAIN'}</span>
+                                                  </div>
+                                                </div>
+                                              ))
+                                            ) : (
+                                              <>
+                                                {/* Fallback Legacy (compatibilité données anciennes) */}
+                                                <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                     <span>{p.logistique.transports[0].aller.lieuDepart}</span>
+                                                     <ArrowRight className="w-4 h-4 text-blue-400" />
+                                                     <span>{p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
+                                                  </div>
+                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.date}</span>
+                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].aller.depart}</span>
+                                                    <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].aller.numero || 'TRAIN'}</span>
+                                                  </div>
+                                                </div>
 
-                                            {p.logistique.transports[0].aller.correspondanceLieu && (
-                                              <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                                <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                   <span>{p.logistique.transports[0].aller.correspondanceLieu}</span>
-                                                   <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                   <span>{p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceDate || p.logistique.transports[0].aller.date}</span>
-                                                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceHeure}</span>
-                                                  <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceNumero || 'TRAIN 2'}</span>
-                                                </div>
-                                              </div>
+                                                {p.logistique.transports[0].aller.correspondanceLieu && (
+                                                  <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                    <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                       <span>{p.logistique.transports[0].aller.correspondanceLieu}</span>
+                                                       <ArrowRight className="w-4 h-4 text-blue-400" />
+                                                       <span>{p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceDate || p.logistique.transports[0].aller.date}</span>
+                                                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceHeure}</span>
+                                                      <span className="flex items-center gap-1 text-blue-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceNumero || 'TRAIN 2'}</span>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </>
                                             )}
                                           </div>
                                         </div>
@@ -1372,33 +1392,53 @@ export default function Dashboard() {
                                           </div>
 
                                           <div className="space-y-3 relative before:absolute before:left-[1.25rem] before:top-8 before:bottom-8 before:w-px before:bg-orange-100 dark:before:bg-orange-900/40">
-                                            {/* Segment 1 */}
-                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                              <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                 <span>{p.logistique.transports[0].retour.lieuDepart}</span>
-                                                 <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
-                                              </div>
-                                              <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.date}</span>
-                                                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].retour.depart}</span>
-                                                <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].retour.numero || 'TRAIN'}</span>
-                                              </div>
-                                            </div>
+                                            {/* Nouveau : On mappe TOUS les segments s'ils existent */}
+                                            {p.logistique.transports[0].retour.segments && p.logistique.transports[0].retour.segments.length > 0 ? (
+                                              p.logistique.transports[0].retour.segments.map((seg, idx) => (
+                                                <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                     <span>{seg.lieuDepart}</span>
+                                                     <ArrowRight className="w-4 h-4 text-orange-400" />
+                                                     <span>{seg.lieuArrivee}</span>
+                                                  </div>
+                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {seg.date || p.logistique.transports[0].retour.date}</span>
+                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {seg.depart}</span>
+                                                    <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {seg.numero || 'TRAIN'}</span>
+                                                  </div>
+                                                </div>
+                                              ))
+                                            ) : (
+                                              <>
+                                                {/* Fallback Legacy */}
+                                                <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                  <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                     <span>{p.logistique.transports[0].retour.lieuDepart}</span>
+                                                     <ArrowRight className="w-4 h-4 text-orange-400" />
+                                                     <span>{p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
+                                                  </div>
+                                                  <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.date}</span>
+                                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].retour.depart}</span>
+                                                    <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].retour.numero || 'TRAIN'}</span>
+                                                  </div>
+                                                </div>
 
-                                            {p.logistique.transports[0].retour.correspondanceLieu && (
-                                              <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
-                                                <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                                   <span>{p.logistique.transports[0].retour.correspondanceLieu}</span>
-                                                   <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                   <span>{p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
-                                                </div>
-                                                <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                                                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceDate || p.logistique.transports[0].retour.date}</span>
-                                                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceHeure}</span>
-                                                  <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceNumero || 'TRAIN 2'}</span>
-                                                </div>
-                                              </div>
+                                                {p.logistique.transports[0].retour.correspondanceLieu && (
+                                                  <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
+                                                    <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                                       <span>{p.logistique.transports[0].retour.correspondanceLieu}</span>
+                                                       <ArrowRight className="w-4 h-4 text-orange-400" />
+                                                       <span>{p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceDate || p.logistique.transports[0].retour.date}</span>
+                                                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceHeure}</span>
+                                                      <span className="flex items-center gap-1 text-orange-500/80"><Train className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceNumero || 'TRAIN 2'}</span>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </>
                                             )}
                                           </div>
                                         </div>

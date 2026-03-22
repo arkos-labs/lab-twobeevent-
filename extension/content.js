@@ -132,38 +132,17 @@ function extractAllDetails() {
       return data;
     }
 
-    // Construire les segments
+    // Construire TOUS les segments détectés
     const segments = [];
-
-    if (dedupedStops.length === 2) {
-      // Trajet direct : 1 seul segment
+    for (let i = 0; i < dedupedStops.length - 1; i++) {
       segments.push({
-        depart: dedupedStops[0].time,
-        arrivee: dedupedStops[1].time,
-        lieuDepart: dedupedStops[0].name,
-        lieuArrivee: dedupedStops[1].name,
-        numero: trainNumbers[0] || "",
-        duree: totalDuration,
-      });
-    } else if (dedupedStops.length >= 3) {
-      // Avec correspondance : 2 segments
-      // Segment 1 : gare départ → gare correspondance
-      segments.push({
-        depart: dedupedStops[0].time,
-        arrivee: dedupedStops[1].time,
-        lieuDepart: dedupedStops[0].name,
-        lieuArrivee: dedupedStops[1].name,
-        numero: trainNumbers[0] || "",
-        duree: "",
-      });
-      // Segment 2 : gare correspondance → gare arrivée finale
-      segments.push({
-        depart: dedupedStops[dedupedStops.length - 2].time,
-        arrivee: dedupedStops[dedupedStops.length - 1].time,
-        lieuDepart: dedupedStops[dedupedStops.length - 2].name,
-        lieuArrivee: dedupedStops[dedupedStops.length - 1].name,
-        numero: trainNumbers[1] || "",
-        duree: "",
+        depart: dedupedStops[i].time,
+        arrivee: dedupedStops[i+1].time,
+        lieuDepart: dedupedStops[i].name,
+        lieuArrivee: dedupedStops[i+1].name,
+        numero: trainNumbers[i] || trainNumbers[0] || "",
+        date: cleanDate,
+        duree: "", // Durée du segment si dispo
       });
     }
 

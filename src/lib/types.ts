@@ -1,3 +1,15 @@
+export interface Segment {
+  lieuDepart: string;
+  lieuArrivee: string;
+  depart: string;
+  arrivee: string;
+  date?: string;
+  numero: string;
+  duree?: string;
+  classe?: string;
+  placement?: string;
+}
+
 export interface Trajet {
   type: 'TRAIN' | 'FLIGHT';
   numero: string;
@@ -6,6 +18,7 @@ export interface Trajet {
   arrivee: string;
   lieuDepart: string;
   lieuArrivee: string;
+  segments?: Segment[];
   correspondanceLieu?: string;
   correspondanceHeure?: string;
   correspondanceArrivee?: string;
