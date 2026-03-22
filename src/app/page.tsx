@@ -44,7 +44,31 @@ const validateEmail = (email: string) => {
 const propositionVide = (): PropositionTransport => ({ aller: trajetVide(), retour: trajetVide() });
 
 const normalizeParticipant = (p: any): Participant => {
-  const transports = p.logistique?.transports || p.proposition_transport || p.transports || [];
+  const cleanTransport = (t: any) => {
+    const cleanStr = (s: any) => {
+      if (!s || typeof s !== 'string') return s;
+      const lowered = s.toLowerCase();
+      if (lowered.includes('durée') || lowered.includes('trajet') || lowered.includes('correspondance') || lowered.length < 2) return '';
+      return s;
+    };
+    return {
+      ...t,
+      aller: t.aller ? {
+        ...t.aller,
+        lieuDepart: cleanStr(t.aller.lieuDepart),
+        lieuArrivee: cleanStr(t.aller.lieuArrivee),
+        correspondanceLieu: cleanStr(t.aller.correspondanceLieu)
+      } : undefined,
+      retour: t.retour ? {
+        ...t.retour,
+        lieuDepart: cleanStr(t.retour.lieuDepart),
+        lieuArrivee: cleanStr(t.retour.lieuArrivee),
+        correspondanceLieu: cleanStr(t.retour.correspondanceLieu)
+      } : undefined
+    };
+  };
+
+  const transports = (p.logistique?.transports || p.proposition_transport || p.transports || []).map(cleanTransport);
   const hotels = p.logistique?.hotels || p.proposition_hotel || p.hotels || [];
   const hasLogistique = !!p.logistique || transports.length > 0 || hotels.length > 0;
 
@@ -1313,7 +1337,7 @@ export default function Dashboard() {
                                               <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                  <span>{p.logistique.transports[0].aller.lieuDepart}</span>
                                                  <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu || (p.logistique.transports[0].aller.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].aller.lieuArrivee)}</span>
+                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
                                               </div>
                                               <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.date}</span>
@@ -1327,7 +1351,7 @@ export default function Dashboard() {
                                                 <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                    <span>{p.logistique.transports[0].aller.correspondanceLieu}</span>
                                                    <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                   <span>{p.logistique.transports[0].aller.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].aller.lieuArrivee}</span>
+                                                   <span>{p.logistique.transports[0].aller.lieuArrivee || 'Arrivée'}</span>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceDate || p.logistique.transports[0].aller.date}</span>
@@ -1353,7 +1377,7 @@ export default function Dashboard() {
                                               <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                  <span>{p.logistique.transports[0].retour.lieuDepart}</span>
                                                  <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu || (p.logistique.transports[0].retour.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].retour.lieuArrivee)}</span>
+                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
                                               </div>
                                               <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.date}</span>
@@ -1367,7 +1391,7 @@ export default function Dashboard() {
                                                 <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                    <span>{p.logistique.transports[0].retour.correspondanceLieu}</span>
                                                    <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                   <span>{p.logistique.transports[0].retour.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].retour.lieuArrivee}</span>
+                                                   <span>{p.logistique.transports[0].retour.lieuArrivee || 'Arrivée'}</span>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceDate || p.logistique.transports[0].retour.date}</span>
