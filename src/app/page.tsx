@@ -1307,11 +1307,19 @@ export default function Dashboard() {
                                           {p.logistique.transports[0].aller.depart || '--:--'} à {p.logistique.transports[0].aller.arrivee || '--:--'}
                                         </p>
                                         {p.logistique.transports[0].aller.correspondanceLieu && (
-                                          <p className="text-[10px] text-blue-500">
-                                            Correspondance: {p.logistique.transports[0].aller.correspondanceLieu}
-                                            {p.logistique.transports[0].aller.correspondanceHeure ? ` (${p.logistique.transports[0].aller.correspondanceHeure})` : ''}
-                                          </p>
-                                        )}
+                                           <div className="mt-1 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                                              <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter mb-0.5">Escale</p>
+                                              <div className="flex justify-between items-center">
+                                                <p className="text-[10px] text-blue-700 font-bold">
+                                                  {p.logistique.transports[0].aller.correspondanceLieu}
+                                                  {p.logistique.transports[0].aller.correspondanceNumero ? ` • N° ${p.logistique.transports[0].aller.correspondanceNumero}` : ''}
+                                                </p>
+                                              </div>
+                                              <p className="text-[9px] text-blue-500 font-medium">
+                                                {p.logistique.transports[0].aller.correspondanceArrivee || '--:--'} → {p.logistique.transports[0].aller.correspondanceHeure || '--:--'}
+                                              </p>
+                                           </div>
+                                         )}
                                       </div>
                                     </div>
                                   ) : (
