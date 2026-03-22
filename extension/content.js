@@ -24,16 +24,17 @@ function extractAllDetails() {
     const stationBlocks = Array.from(detailPanel.querySelectorAll('div, p, span'))
       .filter(el => {
           const t = el.innerText.trim();
-          // On veut des lignes courtes qui ressemblent à "HH:mm Nom de la Gare"
-          return /^\d{2}:\d{2}\s+.+$/.test(t) && t.length < 100;
+          // On veut des lignes qui commencent par HH:mm, éventuellement suivies d'un séparateur
+          return /^\d{2}:\d{2}\s*[-•]?\s*.+$/.test(t) && t.length < 100;
       })
-      // On ne garde que les éléments de plus bas niveau qui matchent pour éviter les doublons parents
+      // On ne garde que les éléments de plus bas niveau qui matchent
       .filter((el, index, self) => !self.some((other, otherIdx) => index !== otherIdx && el.contains(other)));
     
     const parsedStations = stationBlocks.map(el => {
-      const match = el.innerText.trim().match(/^(\d{2}:\d{2})\s+(.+)$/);
-      return match ? { time: match[1], name: match[2] } : null;
+      const match = el.innerText.trim().match(/^(\d{2}:\d{2})\s*[-•]?\s*(.+)$/);
+      return match ? { time: match[1], name: match[2].trim() } : null;
     }).filter(Boolean);
+
 
     // Extraction des trains (ex: TGV INOUI n° 6805)
     const trainMatches = text.match(/(TGV INOUI|OUIGO|TER|INTERCIT|TGV|Bus)\s+(?:Grande Vitesse\s+)?(?:n°\s+)?(\d+)/g) || [];
@@ -79,7 +80,7 @@ function extractAllDetails() {
         isReturn: isReturn,
         tripType: tripType,
         type: "TRAIN",
-        numero: trainMatches.join(' / '),
+        numero: trainMatches[0] || "",
         depart: parsedStations[0].time,
         arrivee: parsedStations[parsedStations.length - 1].time,
         lieuDepart: parsedStations[0].name,
@@ -88,8 +89,10 @@ function extractAllDetails() {
         co2: co2Match ? co2Match[1] : null,
         date: Array.from(detailPanel.querySelectorAll('p, span')).find(el => el.innerText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\. \d+/))?.innerText || "",
         correspondanceLieu: layoverInfo ? layoverInfo.location : "",
+        correspondanceNumero: trainMatches.length > 1 ? trainMatches[1] : "", // Fallback
         segments: segments
       };
+
 
     }
 

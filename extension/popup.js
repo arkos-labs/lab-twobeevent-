@@ -53,17 +53,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         let transportSummary = "";
         if (transportData.aller) {
             const a = transportData.aller;
-            transportSummary += `✅ ALLER: ${a.depart} → ${a.arrivee} (${a.departureTime})\n${a.numero}\n`;
+            transportSummary += `✅ ALLER: ${a.depart} → ${a.arrivee} (${a.departureTime})\n${a.numero}${a.correspondanceLieu ? ` (Escale: ${a.correspondanceLieu})` : ''}\n`;
         } else {
             transportSummary += `❌ ALLER: Non détecté\n`;
         }
-
+ 
         if (transportData.retour) {
             const r = transportData.retour;
-            transportSummary += `\n✅ RETOUR: ${r.depart} → ${r.arrivee} (${r.departureTime})\n${r.numero}\n`;
+            transportSummary += `\n✅ RETOUR: ${r.depart} → ${r.arrivee} (${r.departureTime})\n${r.numero}${r.correspondanceLieu ? ` (Escale: ${r.correspondanceLieu})` : ''}\n`;
         } else {
             transportSummary += `\n❌ RETOUR: Non détecté\n`;
         }
+
 
         transportInfoEl.innerText = transportSummary;
         transportInfoEl.style.whiteSpace = 'pre-line';
