@@ -1727,54 +1727,91 @@ export default function Dashboard() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => {
-                        const text = prompt("Collez ici le texte du récapitulatif de voyage (SNCF, Google Flights, etc.) :");
-                        if (text) {
-                          // Tentative de parsing intelligent (Regex simple pour SNCF Connect)
-                          const times = text.match(/\d{2}:\d{2}/g) || [];
-                          const trainMatch = text.match(/(?:TGV INOUI|OUIGO|TER|INTERCITÉ|TGV|Bus|Train)\s+(?:n°\s+)?(\d+)/i);
-                          const dateMatch = text.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+(\d+\s+\w+)/i);
-                          
-                          // Parsing des gares : on cherche les lignes qui commencent ou finissent par une heure
-                          const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-                          let gares = [];
-                          lines.forEach(line => {
-                            const timeMatch = line.match(/^(\d{2}:\d{2})\s+(.+)$/) || line.match(/^(.+)\s+(\d{2}:\d{2})$/);
-                            if (timeMatch) {
-                              const time = timeMatch[1].includes(':') ? timeMatch[1] : timeMatch[2];
-                              const name = timeMatch[1].includes(':') ? timeMatch[2] : timeMatch[1];
-                              // Nettoyage rapide du nom
-                              const cleanName = name.replace(/^(TGV INOUI|OUIGO|TER|INTERCITÉ|TGV|Bus|Ligne|Train|Car)\s*/i, "").trim();
-                              gares.push({ time, name: cleanName });
-                            }
-                          });
+                        const text = prompt("Collez ici le texte complet du récapitulatif de voyage (SNCF Connect) :");
+                        if (!text) return;
 
-                          if (gares.length >= 2) {
-                            const newProp = propositionVide();
-                            newProp.aller.date = dateMatch ? dateMatch[1] : "";
-                            newProp.aller.depart = gares[0].time;
-                            newProp.aller.lieuDepart = gares[0].name;
-                            newProp.aller.numero = trainMatch ? trainMatch[1] : "";
-                            
-                            if (gares.length === 2) {
-                               newProp.aller.arrivee = gares[1].time;
-                               newProp.aller.lieuArrivee = gares[1].name;
-                            } else if (gares.length >= 4) {
-                               // Probablement une escale
-                               newProp.aller.correspondanceLieu = gares[1].name;
-                               newProp.aller.correspondanceArrivee = gares[1].time;
-                               newProp.aller.correspondanceHeure = gares[2].time;
-                               newProp.aller.arrivee = gares[3].time;
-                               newProp.aller.lieuArrivee = gares[3].name;
-                            } else {
-                               newProp.aller.arrivee = gares[gares.length-1].time;
-                               newProp.aller.lieuArrivee = gares[gares.length-1].name;
+                        const parseSNCF = (rawText: string) => {
+                          const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                          const isTime = (s: string) => /^\d{2}:\d{2}$/.test(s);
+                          const BLACKLIST = [/dur[eé]e/i, /trajet/i, /correspondance/i, /accueil/i, /placement/i, /voiture/i, /place/i, /classe/i, /^opéré/i, /wifi/i, /restauration/i];
+                          const isBlacklisted = (s: string) => BLACKLIST.some(r => r.test(s));
+
+                          const stops = [];
+                          for (let i = 0; i < lines.length; i++) {
+                            if (isTime(lines[i])) {
+                              let name = "";
+                              for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+                                if (isTime(lines[j])) break;
+                                if (!isBlacklisted(lines[j]) && lines[j].length > 2 && lines[j].length < 60) {
+                                  name = lines[j].replace(/^(TGV INOUI|OUIGO|TER|INTERCITÉS?|TGV|Bus|Ligne|Train|Car)\s*/i, "").trim();
+                                  break;
+                                }
+                              }
+                              if (name) stops.push({ time: lines[i], name });
                             }
-                            
-                            setTransports(t => [...t, newProp]);
-                          } else {
-                            alert("Format non reconnu. Essayez de copier tout le texte du récapitulatif.");
                           }
-                        }
+
+                          const deduped = [];
+                          for (let i = 0; i < stops.length; i++) {
+                            if (i === 0 || stops[i].name !== stops[i-1].name) deduped.push(stops[i]);
+                          }
+
+                          const trainNumbers = rawText.match(/(?:INTERCITÉS?|TGV INOUI|OUIGO|TER|Train li[Oo]|Autocar Rémi Exp|TGV)\s+\d+/gi) || [];
+                          const cleanDate = (rawText.match(/((?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+\d+\s+\w+)/i) || ["", ""])[1];
+
+                          const createSegments = (stopList: any[]) => {
+                            const segs = [];
+                            for (let i = 0; i < stopList.length - 1; i++) {
+                              segs.push({
+                                depart: stopList[i].time,
+                                arrivee: stopList[i+1].time,
+                                lieuDepart: stopList[i].name,
+                                lieuArrivee: stopList[i+1].name,
+                                numero: (trainNumbers[i] || trainNumbers[0] || "").replace(/\s+/g, ' ').trim(),
+                                date: cleanDate
+                              });
+                            }
+                            return segs;
+                          };
+
+                          const retourIdx = rawText.toLowerCase().indexOf('retour :');
+                          const allerStops = deduped.filter(s => rawText.indexOf(s.time) < (retourIdx !== -1 ? retourIdx : 999999));
+                          const retourStops = deduped.filter(s => rawText.indexOf(s.time) >= (retourIdx !== -1 ? retourIdx : 999999));
+
+                          const transport = propositionVide();
+                          if (allerStops.length >= 2) {
+                            const segs = createSegments(allerStops);
+                            transport.aller = {
+                              ...transport.aller,
+                              segments: segs,
+                              date: cleanDate,
+                              depart: segs[0].depart,
+                              arrivee: segs[segs.length-1].arrivee,
+                              lieuDepart: segs[0].lieuDepart,
+                              lieuArrivee: segs[segs.length-1].lieuArrivee,
+                              numero: segs[0].numero,
+                              correspondanceLieu: segs.length > 1 ? segs[0].lieuArrivee : ""
+                            };
+                          }
+                          if (retourStops.length >= 2) {
+                            const segs = createSegments(retourStops);
+                            transport.retour = {
+                              ...transport.retour,
+                              segments: segs,
+                              date: cleanDate,
+                              depart: segs[0].depart,
+                              arrivee: segs[segs.length-1].arrivee,
+                              lieuDepart: segs[0].lieuDepart,
+                              lieuArrivee: segs[segs.length-1].lieuArrivee,
+                              numero: segs[0].numero,
+                              correspondanceLieu: segs.length > 1 ? segs[0].lieuArrivee : ""
+                            };
+                          }
+                          return transport;
+                        };
+
+                        const extracted = parseSNCF(text);
+                        setTransports(t => [...t, extracted]);
                       }}
                       className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center gap-2"
                     >
