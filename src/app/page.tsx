@@ -1313,7 +1313,7 @@ export default function Dashboard() {
                                               <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                  <span>{p.logistique.transports[0].aller.lieuDepart}</span>
                                                  <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu || p.logistique.transports[0].aller.lieuArrivee}</span>
+                                                 <span>{p.logistique.transports[0].aller.correspondanceLieu || (p.logistique.transports[0].aller.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].aller.lieuArrivee)}</span>
                                               </div>
                                               <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.date}</span>
@@ -1323,18 +1323,11 @@ export default function Dashboard() {
                                             </div>
 
                                             {p.logistique.transports[0].aller.correspondanceLieu && (
-                                              <div className="flex items-center gap-2 pl-12 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                                                <div className="w-4 h-px bg-gray-100" />
-                                                <span>Escale à {p.logistique.transports[0].aller.correspondanceLieu} ({p.logistique.transports[0].aller.correspondanceDuree || ''})</span>
-                                              </div>
-                                            )}
-
-                                            {p.logistique.transports[0].aller.correspondanceLieu && (
                                               <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
                                                 <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                    <span>{p.logistique.transports[0].aller.correspondanceLieu}</span>
                                                    <ArrowRight className="w-4 h-4 text-blue-400" />
-                                                   <span>{p.logistique.transports[0].aller.lieuArrivee}</span>
+                                                   <span>{p.logistique.transports[0].aller.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].aller.lieuArrivee}</span>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].aller.correspondanceDate || p.logistique.transports[0].aller.date}</span>
@@ -1360,7 +1353,7 @@ export default function Dashboard() {
                                               <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                  <span>{p.logistique.transports[0].retour.lieuDepart}</span>
                                                  <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu || p.logistique.transports[0].retour.lieuArrivee}</span>
+                                                 <span>{p.logistique.transports[0].retour.correspondanceLieu || (p.logistique.transports[0].retour.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].retour.lieuArrivee)}</span>
                                               </div>
                                               <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.date}</span>
@@ -1370,18 +1363,11 @@ export default function Dashboard() {
                                             </div>
 
                                             {p.logistique.transports[0].retour.correspondanceLieu && (
-                                              <div className="flex items-center gap-2 pl-12 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                                                <div className="w-4 h-px bg-gray-100" />
-                                                <span>Escale à {p.logistique.transports[0].retour.correspondanceLieu} ({p.logistique.transports[0].retour.correspondanceDuree || ''})</span>
-                                              </div>
-                                            )}
-
-                                            {p.logistique.transports[0].retour.correspondanceLieu && (
                                               <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm relative z-10 transition-all hover:shadow-md">
                                                 <div className="text-[14px] font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                                    <span>{p.logistique.transports[0].retour.correspondanceLieu}</span>
                                                    <ArrowRight className="w-4 h-4 text-orange-400" />
-                                                   <span>{p.logistique.transports[0].retour.lieuArrivee}</span>
+                                                   <span>{p.logistique.transports[0].retour.lieuArrivee?.toLowerCase().includes('dur') ? 'Destination' : p.logistique.transports[0].retour.lieuArrivee}</span>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                                                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {p.logistique.transports[0].retour.correspondanceDate || p.logistique.transports[0].retour.date}</span>
