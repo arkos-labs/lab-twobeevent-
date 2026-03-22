@@ -6,7 +6,7 @@ import {
   MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
-  Moon, Sun, Wand2, Zap
+  Moon, Sun, Wand2, Zap, ArrowRight
 } from 'lucide-react';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import { openGoogleFlights, openGoogleHotels, openSNCF, openTrainline } from '@/lib/searchUtils';
