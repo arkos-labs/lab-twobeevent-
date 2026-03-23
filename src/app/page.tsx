@@ -236,9 +236,18 @@ export default function Dashboard() {
   };
 
   // ─── Ajout d'un congrès ──────────────────────────────────────────────────────
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+  };
+
   const handleAddCongres = () => {
-    if (!newNom.trim()) return;
-    const id = crypto.randomUUID();
+    if (!newNom.trim()) {
+      alert("Le nom de l'événement est obligatoire !");
+      return;
+    }
+    
+    const id = generateId();
     const newCongres = {
       id,
       nom: newNom.trim(),
@@ -255,10 +264,14 @@ export default function Dashboard() {
     // Mise à jour de l'état React
     setCongres(prev => [...prev, newCongres]);
     
-    // Marquer que l'utilisateur a deja agi
+    // Marquer que l'utilisateur a deja agi pour activer la synchro
     initializedRef.current = true;
 
+    // S'assurer de basculer sur le Tableau de Bord pour voir la création
+    setViewMode('BOARD');
     setSelectedId(id);
+    
+    // Reset du formulaire
     setNewNom('');
     setNewDate('');
     setNewDateFin('');
@@ -344,8 +357,9 @@ export default function Dashboard() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target?.result, { type: 'binary' });
+    reader.onload = async (evt) => {
+      const arrayBuffer = evt.target?.result as ArrayBuffer;
+      const wb = XLSX.read(arrayBuffer, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
 
@@ -361,17 +375,17 @@ export default function Dashboard() {
         }
       }
 
-      const imported: Participant[] = rows.map((row, index) => {
+      const imported: Participant[] = rows.map((row) => {
         const prenom = String(row['K'] || '').trim();
         const nom = String(row['L'] || '').trim();
-        const email = String(row['P'] || '').trim();   // Col P
-        const telephone = String(row['O'] || '').trim();   // Col O
-        const codePostal = String(row['T'] || '').trim();  // Col T
-        const ville = String(row['U'] || '').trim();       // Col U
-        const etablissement = String(row['Q'] || '').trim(); // Col Q
+        const email = String(row['P'] || '').trim();
+        const telephone = String(row['O'] || '').trim();
+        const codePostal = String(row['T'] || '').trim();
+        const ville = String(row['U'] || '').trim();
+        const etablissement = String(row['Q'] || '').trim();
 
         return {
-          id: crypto.randomUUID(),
+          id: generateId(), // Utilisation du helper sécurisé
           nom: `${prenom} ${nom}`.trim() || 'Inconnu',
           email,
           telephone,
@@ -382,9 +396,23 @@ export default function Dashboard() {
         };
       });
 
-      updateParticipants(selectedId, () => imported);
+      // Conversion de l'ArrayBuffer en Base64 pour le template
+      const base64 = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = (re) => resolve(re.target?.result as string);
+        r.readAsDataURL(file);
+      });
+
+      // Mise à jour groupée pour éviter les race conditions
+      setCongres(prev => prev.map(c => 
+        c.id === selectedId 
+          ? { ...c, participants: [...c.participants, ...imported], logisticsTemplate: base64 } 
+          : c
+      ));
+
+      console.log(`✅ ${imported.length} participants importés et template sauvegardé.`);
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -451,11 +479,11 @@ export default function Dashboard() {
       .replace(/{NB_HOTEL}/g, nbH.toString());
 
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${participant.email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.click();
+    const aHost = document.createElement('a');
+    aHost.href = url;
+    aHost.target = '_blank';
+    aHost.rel = 'noopener noreferrer';
+    aHost.click();
   };
 
   const downloadBase64File = (base64: string, filename: string) => {
@@ -467,8 +495,7 @@ export default function Dashboard() {
     document.body.removeChild(a);
   };
 
-
-  const getParticipantTemplateData = (participant: Participant, congres: Congres) => {
+  const getParticipantTemplateData = (participant: Participant, congres: Congres): Record<string, string> => {
     const log = participant.logistique;
     const aller = log?.transports?.[0]?.aller;
     const retour = log?.transports?.[0]?.retour;
@@ -489,9 +516,9 @@ export default function Dashboard() {
       // Congrès
       CONGRES: congres.nom,
       "Nom de l'événement": congres.nom,
-      DATE: congres.date,
-      LIEU: congres.lieu,
-      ADRESSE: congres.adresse,
+      DATE: congres.date || '',
+      LIEU: congres.lieu || '',
+      ADRESSE: congres.adresse || '',
       
       // Acheminement Aller
       ALLER_DEPART: aller?.lieuDepart || '',
@@ -533,14 +560,27 @@ export default function Dashboard() {
       CHECK_IN: hotel?.checkIn || '',
       CHECK_OUT: hotel?.checkOut || '',
       'Nuit du 18 juin': hotel?.checkIn?.includes('18/06') ? 'OUI' : '',
-      'Nuit du 19 juin': hotel?.checkOut?.includes('20/06') ? 'OUI' : ''
+      'Nuit du 19 juin': hotel?.checkOut?.includes('20/06') ? 'OUI' : '',
+
+      // Keys for JNI Formula support
+      'NOM PRENOM': participant.nom,
+      'GARE DEPART ALLER': aller?.lieuDepart || '',
+      'GARE ARRIVEE ALLER': aller?.lieuArrivee || '',
+      'HEURE DEPART ALLER': aller?.depart || '',
+      'HEURE ARRIVEE ALLER': aller?.arrivee || '',
+      'NUMERO TRAIN ALLER': aller?.numero || '',
+      'GARE DEPART RETOUR': retour?.lieuDepart || '',
+      'GARE ARRIVEE RETOUR': retour?.lieuArrivee || '',
+      'HEURE DEPART RETOUR': retour?.depart || '',
+      'HEURE ARRIVEE RETOUR': retour?.arrivee || '',
+      'NUMERO TRAIN RETOUR': retour?.numero || '',
     };
   };
 
   const fillAndDownloadTemplate = async (templateB64: string, participant: Participant, congres: Congres, type: string) => {
     let filename = `${type}_${participant.nom.replace(/\s+/g, '_')}`;
     // Si c'est le modèle par défaut ou JNI
-    if (templateB64.includes(JNI_EXCEL.substring(0, 20)) || congres.nom?.toUpperCase().includes('JNI')) {
+    if (templateB64.includes(JNI_EXCEL.substring(0, 20)) || (congres.nom && congres.nom.toUpperCase().includes('JNI'))) {
       if (type === 'Proposition' || type === 'Logistique') filename = `Modele_JNI_2026_REMPLI_${participant.nom.replace(/\s+/g, '_')}`;
       if (type === 'Bulletin') filename = `Bulletin_Invitation_JNI_2026_${participant.nom.replace(/\s+/g, '_')}`;
     }
@@ -552,48 +592,39 @@ export default function Dashboard() {
 
     if (isXlsx) {
       try {
-        console.log("🛠️ Remplissage Excel par détection de colonnes...");
+        console.log("🛠️ Remplissage Excel (avec conservation des formules)...");
         const base64Data = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
-        const wb = XLSX.read(base64Data, { type: 'base64' });
+        
+        // IMPORTANT: Lire avec cellFormula: true pour ne pas perdre les formules existantes
+        const wb = XLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
 
-        // 1. Détection des en-têtes
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z100');
-        const headerMap: Record<string, number> = {};
+        // 1. Détection des en-têtes et remplissage par correspondance (pour formulaires)
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z200');
+        const headerMap: Record<string, {r: number, c: number}> = {};
         
-        // On scanne les 100 premières lignes pour trouver les colonnes ou étiquettes
-        for (let r = 0; r <= 100; r++) {
+        for (let r = range.s.r; r <= Math.min(range.e.r, 150); r++) {
           for (let c = range.s.c; c <= range.e.c; c++) {
             const cell = ws[XLSX.utils.encode_cell({ r, c })];
             if (cell && cell.v) {
               const val = String(cell.v).trim().toLowerCase();
               Object.keys(data).forEach(k => {
-                // Correspondance exacte ou inclusion pour "Gare de départ aller" etc.
-                if (k.toLowerCase() === val || val === k.toLowerCase() + ':' || val.includes(k.toLowerCase())) {
-                  headerMap[k] = c;
+                const keyLower = k.toLowerCase();
+                if (val === keyLower || val === keyLower + ':') {
+                  headerMap[k] = {r, c};
                 }
               });
             }
           }
         }
 
-        if (Object.keys(headerMap).length > 0) {
-          // On ajoute les données sur la ligne juste après les en-têtes ou la première ligne vide
-          let rowToFill = 1;
-          // On cherche la première ligne vide en colonne A (ou première colonne trouvée)
-          const firstCol = headerMap['NOM'] || 0;
-          while (ws[XLSX.utils.encode_cell({ r: rowToFill, c: firstCol })]?.v) {
-            rowToFill++;
-          }
-          
-          Object.entries(headerMap).forEach(([key, col]) => {
-            const addr = XLSX.utils.encode_cell({ r: rowToFill, c: col });
-            ws[addr] = { v: data[key], t: 's' };
-          });
-          console.log(`✅ Ligne ${rowToFill + 1} remplie via en-têtes.`);
-        }
+        // Remplissage à droite du label trouvé
+        Object.entries(headerMap).forEach(([key, pos]) => {
+          const targetAddr = XLSX.utils.encode_cell({ r: pos.r, c: pos.c + 1 });
+          ws[targetAddr] = { v: data[key], t: 's' };
+        });
 
-        // 2. Fallback: Remplacement de placeholders (si présents)
+        // 2. Remplacement des placeholders type {NOM} dans tout le document
         Object.keys(ws).forEach(addr => {
           if (addr[0] === '!') return;
           const cell = ws[addr];
@@ -620,7 +651,6 @@ export default function Dashboard() {
         downloadBase64File(templateB64, `${filename}.xlsx`);
       }
     } else if (isDocx) {
-      console.log("📄 Tentative de remplissage Word (Docx)...");
       try {
         const base64Part = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
         const binaryString = window.atob(base64Part);
@@ -637,7 +667,7 @@ export default function Dashboard() {
           fixEmptyTags: true
         } as any);
 
-        const blob = new Blob([report], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const blob = new Blob([report as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -646,14 +676,11 @@ export default function Dashboard() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        console.log("✅ Word personnalisé téléchargé.");
       } catch (err) {
         console.error("❌ WORD Fill Error:", err);
-        // Fallback brut
         downloadBase64File(templateB64, `${filename}.docx`);
       }
     } else if (isPdf) {
-      console.log("🛠️ Téléchargement du modèle PDF...");
       downloadBase64File(templateB64, `${filename}.pdf`);
     }
   };
@@ -887,6 +914,72 @@ export default function Dashboard() {
       return;
     }
 
+    // Si on a un modèle (typiquement le fichier importé), on l'utilise pour conserver la structure
+    if (c.logisticsTemplate && (c.logisticsTemplate.includes('spreadsheetml') || c.logisticsTemplate.includes('excel'))) {
+      try {
+        console.log("🧬 Export synchronisé avec le fichier source...");
+        const base64Data = c.logisticsTemplate.includes(',') ? c.logisticsTemplate.split(',')[1] : c.logisticsTemplate;
+        const wb = XLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
+
+        // On cherche les colonnes cibles si possible, sinon on utilise des index fixes basés sur l'expérience JNI
+        // Expérience JNI : 
+        // V: Gare Dep Aller, W: Heure Dep, X: Gare Arr, Y: Heure Arr, Z: N° Train
+        // AB: Gare Dep Ret, AC: Heure Dep, AD: Gare Arr, AE: Heure Arr, AF: N° Train
+        
+        data.forEach((row, idx) => {
+          const rowNum = idx + 1; // Index 1-based pour XLSX
+          const prenom = String(row['K'] || '').trim();
+          const nom = String(row['L'] || '').trim();
+          const email = String(row['P'] || '').trim();
+          
+          // Match du participant
+          const p = c.participants.find(part => 
+            (part.email && part.email === email) || 
+            (part.nom.toLowerCase().includes(nom.toLowerCase()) && part.nom.toLowerCase().includes(prenom.toLowerCase()))
+          );
+
+          if (p && p.logistique) {
+            const aller = p.logistique.transports[0]?.aller;
+            const retour = p.logistique.transports[0]?.retour;
+            const hotel = p.logistique.hotels[0];
+
+            if (aller) {
+              // Aller selon vocal #3 : AC(28) Type, AD(29) Corresp, AF(31) Gare Dep, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
+              if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
+              if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.correspondanceLieu }; 
+              if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuDepart }; 
+              if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      
+              if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     
+              if (aller.numero) ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: aller.numero };       
+            }
+            if (retour) {
+              // Retour selon vocal #3 : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) Corresp, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
+              if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 34 + 1})] = { v: retour.date }; // AJ(35)
+              if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
+              if (retour.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
+              if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu };
+              if (retour.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
+              if (retour.depart) ws[XLSX.utils.encode_cell({r: idx, c: 40})] = { v: retour.depart };
+              if (retour.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 41})] = { v: retour.arrivee };
+              if (retour.numero) ws[XLSX.utils.encode_cell({r: idx, c: 42})] = { v: retour.numero };
+            }
+            if (hotel && hotel.nom) {
+              ws[XLSX.utils.encode_cell({r: idx, c: 43})] = { v: hotel.nom }; // AR(43)
+            }
+          }
+        });
+
+        const outB64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+        downloadBase64File(`data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${outB64}`, `Base_Sync_${c.nom}.xlsx`);
+        return;
+      } catch (err) {
+        console.error("Erreur Sync Export:", err);
+      }
+    }
+
+    // Fallback : Export standard
     const dataExcel = c.participants.map(p => ({
       "Médecin": p.nom,
       "Email": p.email,
@@ -1976,7 +2069,7 @@ export default function Dashboard() {
 
       {/* ───── MODALE AJOUT CONGRÈS ───── */}
       {addCongressOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg p-10 animate-in fade-in zoom-in duration-300">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
