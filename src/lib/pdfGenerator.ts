@@ -12,13 +12,20 @@ export function generateInvitationPDF(doctorName: string, congres: Congres, logi
     const light = [248, 249, 250];
 
     // 1. EN-TÊTE COMPACT (Réduit pour tout faire tenir sur 1 page)
-    doc.setFillColor(blue[0], blue[1], blue[2]);
-    doc.rect(0, 0, 210, 35, 'F');
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text('PROPOSITION LOGISTIQUE', 105, 18, { align: 'center' });
+    if (congres.logo) {
+        doc.addImage(congres.logo, 'PNG', 15, 5, 25, 25);
+        doc.setTextColor(blue[0], blue[1], blue[2]);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.text('PROPOSITION LOGISTIQUE', 200, 20, { align: 'right' });
+    } else {
+        doc.setFillColor(blue[0], blue[1], blue[2]);
+        doc.rect(0, 0, 210, 35, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text('PROPOSITION LOGISTIQUE', 105, 18, { align: 'center' });
+    }
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -156,6 +163,13 @@ export function generateInvitationPDF(doctorName: string, congres: Congres, logi
     doc.setDrawColor(blue[0], blue[1], blue[2]);
     doc.setLineWidth(0.2);
     doc.line(15, footerY - 5, 195, footerY - 5);
+
+    if (congres.signature) {
+        doc.addImage(congres.signature, 'PNG', 160, footerY - 20, 25, 12);
+        doc.setFontSize(7);
+        doc.setTextColor(gray[0], gray[1], gray[2]);
+        doc.text('Pour accord, la Direction des Affaires Médicales', 172.5, footerY - 22, { align: 'center' });
+    }
 
     doc.setTextColor(dark[0], dark[1], dark[2]);
     doc.setFont("helvetica", "bold");

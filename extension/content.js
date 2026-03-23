@@ -2,82 +2,120 @@ console.log("Twobeevent Capture Content Script injecté.");
 
 function extractAllDetails() {
   const url = window.location.href;
-  let data = { hotel: null, transport: null };
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  // Noms de paramètres utilisés par la plateforme Twobeevent
+  let pId = urlParams.get('twobeevent_participant_id') || 
+            urlParams.get('pId') || 
+            urlParams.get('participantId') || 
+            urlParams.get('id');
+  
+  // Si on est sur la plateforme elle-même, on peut lire l'attribut data mis par la plateforme
+  if (!pId) {
+      pId = document.body.getAttribute('data-twb-active-pid');
+  }
+  
+  // Si toujours pas d'ID, on cherche dans tout le document s'il y a un input avec le nom 'participantId' (cas rare)
+  if (!pId) {
+    const input = document.querySelector('[name*="participantId"], [id*="participantId"]');
+    if (input && input.value) pId = input.value;
+  }
+  
+  let data = { 
+    hotel: null, 
+    transport: null,
+    participantId: pId || null
+  };
+
+  const fullText = document.body.innerText;
+  
+  console.log("[Twobeevent] Début extraction ultra-large...");
 
   // --- LOGIQUE SNCF CONNECT ---
   if (url.includes("sncf-connect.com")) {
-    console.log("[Twobeevent] Page SNCF Connect détectée.");
-    const fullText = document.body.innerText;
-    const timeRangeRegex = /(\d{1,2})[h:](\d{2})\s+à\s+(\d{1,2})[h:](\d{2})/g;
-    const pad = (n) => String(n).padStart(2, '0');
-    const timeRanges = [];
-    let m;
-    while ((m = timeRangeRegex.exec(fullText)) !== null) {
-      timeRanges.push({ depart: `${pad(m[1])}:${m[2]}`, arrivee: `${pad(m[3])}:${m[4]}` });
-    }
-    const NOT_STATION = new RegExp(['voyager','billets','offres','compte','panier','total','valider','ajouter','assurer','frais','annulat','retard','trajet','durée','classe','voiture','place','prise','wifi','espace','couloir','salle','co2','accueil','embarquement','placement','detail','détail','fermer','options?','soutene','donnez','choix','souhait','tgv','ouigo','ter ','inoui','intercit','thalys','eurostar','vols?','trains?','recherch','modifier'].map(w => `^${w}`).join('|'), 'i');
-    const lines = fullText.split('\n').map(l => l.replace(/^[^A-Za-zÀ-ü]+/, '').trim()).filter(l => l.length >= 3);
-    const isStation = (line) => !NOT_STATION.test(line) && !/\d{1,2}[h:]\d{2}/.test(line) && !/^\d/.test(line) && line.length <= 50 && line.length >= 3 && /^[A-ZÀ-Ü]/.test(line) && !/^[A-Z]{2,}\s+\d+/.test(line);
-    const cleanStation = (s) => (s || "").replace(/\b\d{1,2}[h:]\d{2}\b/g, '').replace(/\s+\d+\s+(?:et|&)\s+\d+$/i, '').replace(/\s+\d+$/i, '').trim();
+    console.log("[Twobeevent] Analyse SNCF Connect...");
+    
+    // On cherche les horaires du type "08h12" ou "08:12"
+    const times = Array.from(fullText.matchAll(/(\d{1,2}[h:]\d{2})/g)).map(m => m[1].replace('h', ':'));
+    const trainNums = Array.from(fullText.matchAll(/\b(TGV|OUIGO|TER|INTERCITES)\s*(\d{4,6})\b/gi)).map(m => `${m[1]} ${m[2]}`);
+    
+    // On essaye de trouver les gares (souvent en début de ligne après l'horaire dans le détail)
     const stations = [];
-    for (const line of lines) {
-      if (!isStation(line)) continue;
-      const c = cleanStation(line);
-      if (c.length < 3) continue;
-      if (!stations.find(s => s.toLowerCase() === c.toLowerCase())) stations.push(c);
-      if (stations.length >= 4) break;
+    const lines = fullText.split('\n');
+    lines.forEach(line => {
+      if (line.match(/\d{1,2}[h:]\d{2}/) && line.length > 10) {
+        stations.push(line.replace(/\d{1,2}[h:]\d{2}/, '').trim());
+      }
+    });
+
+    if (times.length >= 2) {
+      data.transport = {
+        aller: {
+          type: "TRAIN",
+          lieuDepart: stations[0] || "Inconnu",
+          lieuArrivee: stations[stations.length - 1] || "Inconnu",
+          depart: times[0],
+          arrivee: times[times.length - 1],
+          numero: trainNums[0] || "",
+          date: "", // SNCF est complexe pour la date, on laisse vide pour l'instant
+          correspondanceLieu: ""
+        },
+        site: "SNCF Connect",
+        type: "TRAIN"
+      };
     }
-    const trainNums = fullText.match(/(?:TGV INOUI|OUIGO|TER|INTERCITÉS?|THALYS|EUROSTAR|LYRIA)\s*\d+/gi) || [];
-    const dateMatches = fullText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+\d+\s+\w+/gi) || [];
-    const gare1 = stations[0] || "";
-    const gare2 = stations[1] || "";
-    const allerTimes = timeRanges[0] || null;
-    const retourTimes = timeRanges[1] || null;
-    const allerTrajet = (gare1 && allerTimes) ? { type: "TRAIN", date: (dateMatches[0] || "").trim(), numero: trainNums[0] || "", depart: allerTimes.depart, arrivee: allerTimes.arrivee, lieuDepart: gare1, lieuArrivee: gare2, correspondanceLieu: "", segments: [] } : null;
-    const retourTrajet = (gare2 && retourTimes) ? { type: "TRAIN", date: (dateMatches[1] || dateMatches[0] || "").trim(), numero: trainNums[1] || trainNums[0] || "", depart: retourTimes.depart, arrivee: retourTimes.arrivee, lieuDepart: gare2, lieuArrivee: gare1, correspondanceLieu: "", segments: [] } : null;
-    data.transport = { aller: allerTrajet, retour: retourTrajet, site: "SNCF Connect", type: "TRAIN" };
   }
 
-  // --- LOGIQUE GOOGLE FLIGHTS ---
+  // --- LOGIQUE GOOGLE FLIGHTS (BÉTON ARMÉ) ---
   if (url.includes("google.com/travel/flights")) {
-    console.log("[Twobeevent] Page Google Flights détectée.");
-    const fullText = document.body.innerText;
+    console.log("[Twobeevent] Analyse Multi-Segments Google Flights...");
     
-    const flightLegs = [];
-    const legRegex = /(\d{1,2}:\d{2})\s*·\s*[^()]+\((([A-Z]{3}))\)/g;
-    let match;
-    while ((match = legRegex.exec(fullText)) !== null) {
-      flightLegs.push({ time: match[1], iata: match[2] });
-    }
+    // On cherche TOUT ce qui ressemble à un horaire HH:MM partout dans le texte
+    const allTimes = Array.from(fullText.matchAll(/(\b\d{1,2}:\d{2}\b)/g)).map(m => m[1]);
+    // On cherche TOUT ce qui ressemble à un code IATA entre parenthèses
+    const allIatas = Array.from(fullText.matchAll(/\(([A-Z]{3})\)/g)).map(m => m[1]);
 
-    const flightNumRegex = /\b([A-Z]{2}\d{3,5}|[A-Z]{2}\s\d{3,5})\b/g;
-    const flightNums = (fullText.match(flightNumRegex) || [])
+    // Stratégie par lignes (plus sûr pour l'ordre)
+    const legs = [];
+    const lines = fullText.split('\n');
+    lines.forEach(line => {
+       const t = line.match(/(\d{1,2}:\d{2})/);
+       const i = line.match(/\(([A-Z]{3})\)/);
+       if (t && i) {
+          legs.push({ time: t[1], iata: i[1] });
+       }
+    });
+
+    const flightNums = (fullText.match(/\b([A-Z]{2}\s?\d{2,5})\b/g) || [])
       .map(f => f.replace(/\s/g, ''))
       .filter(f => !['CO2','TTC','USD','EUR','JPY'].includes(f));
 
-    // Détection Retour BEAUCOUP plus permissive
-    const firstLines = fullText.substring(0, 1000).toLowerCase();
-    const isRetour = firstLines.includes("retour") || firstLines.includes("inbound") || url.includes("inbound");
-    
-    const dateMatch = (fullText.match(/(?:aller|retour)\s*[·.]\s*((?:\w+\.?\s+)?\d+\s+\w+)/i) || 
-                      fullText.match(/(?:Lun|Mar|Mer|Jeu|Ven|Sam|Dim)\.?\s+(\d+\s+\w+)/i) || 
-                      [])[1] || "";
+    // Dates
+    const dates = Array.from(fullText.matchAll(/(?:\w+\.?\s+)?\d+\s+\w+/gi)).map(m => m[0]);
 
-    if (flightLegs.length >= 2) {
-      const trajet = {
-        type: "FLIGHT",
-        lieuDepart: flightLegs[0].iata,
-        lieuArrivee: flightLegs[flightLegs.length - 1].iata,
-        depart: flightLegs[0].time,
-        arrivee: flightLegs[flightLegs.length - 1].time,
-        numero: flightNums[0] || "",
-        date: dateMatch.trim(),
-        correspondanceLieu: flightLegs.length > 2 ? `Escale à ${flightLegs.slice(1, -1).map(l => l.iata).join(', ')}` : ""
+    if (legs.length >= 2) {
+      const aller = {
+        type: "FLIGHT", lieuDepart: legs[0].iata, lieuArrivee: legs[legs.length - 1].iata,
+        depart: legs[0].time, arrivee: legs[legs.length - 1].time,
+        numero: flightNums[0] || "", date: dates[0] || "", correspondanceLieu: ""
       };
+      
+      // On sauvegarde tous les segments si présents
+      if (legs.length > 2) {
+          aller.segments = legs.map((l, idx) => ({
+              depart: l.time,
+              lieuDepart: l.iata,
+              lieuArrivee: legs[idx+1]?.iata || "",
+              numero: flightNums[idx] || flightNums[0] || ""
+          })).slice(0, -1);
+      }
+
+      let retour = null;
+      // ... (Simplifié pour le test)
 
       data.transport = {
-        aller: !isRetour ? trajet : null,
-        retour: isRetour ? trajet : null,
+        aller: aller,
+        retour: null,
         site: "Google Flights",
         type: "FLIGHT"
       };
@@ -85,8 +123,9 @@ function extractAllDetails() {
   }
 
   // --- LOGIQUE HOTELS ---
-  if (url.includes("booking.com") || url.includes("hotels.com")) {
-     const hotelName = document.querySelector("h2.pp-header__title, #hp_hotel_name, .hotel-name")?.innerText;
+  if (url.includes("booking.com") || url.includes("hotels.com") || url.includes("google.com/travel/hotels")) {
+     const titleSel = "h2.pp-header__title, #hp_hotel_name, .hotel-name, [data-testid='header-title'], h1";
+     const hotelName = document.querySelector(titleSel)?.innerText;
      if (hotelName) data.hotel = { name: hotelName.trim() };
   }
 

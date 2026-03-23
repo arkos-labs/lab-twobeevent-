@@ -6,14 +6,16 @@ import {
   MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
-  Moon, Sun, Wand2, Zap, ArrowRight, Eye
+  Moon, Sun, Wand2, Zap, ArrowRight, Eye, FileCheck, FilePlus2, FileText
 } from 'lucide-react';
 import { ParticipantDetailsModal } from './ParticipantDetailsModal';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import { openGoogleFlights, openGoogleHotels, openSNCF, openTrainline } from '@/lib/searchUtils';
 import { fetchAddressSuggestions } from '@/lib/autocomplete';
 import * as XLSX from 'xlsx';
+import { createReport } from 'docx-templates';
 import { supabase } from '@/lib/supabase';
+import { JNI_EXCEL, JNI_DOCX, JNI_BULLETIN_PDF } from './jni_templates';
 import type { Congres, ExportHistory, ExportHistoryRow, Participant, PropositionHotel, PropositionTransport, Segment, Trajet } from '@/lib/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -87,16 +89,29 @@ const normalizeParticipant = (p: any): Participant => {
   };
 };
 
+const isJNIEvent = (name?: string) => {
+  if (!name) return false;
+  const n = name.toUpperCase();
+  return n.includes('JNI') || n.includes('INFECTIOLOGIE') || n.includes('MUNDIPHARMA');
+};
+
 const normalizeCongres = (c: any, allParticipants: any[] = []): Congres => ({
   id: c.id,
-  nom: c.nom || '',
-  date: c.date || c.date_debut || '',
-  dateDebut: c.date_debut || c.dateDebut || c.date || '',
-  dateFin: c.date_fin || c.dateFin || '',
+  nom: c.nom || 'Sans nom',
+  date: c.date_debut || c.date || '',
+  dateDebut: c.date_debut || '',
+  dateFin: c.date_fin || '',
   lieu: c.lieu || '',
   adresse: c.adresse || '',
-  heure: c.heure || '09:00',
+  heure: c.heure || '',
   archive: c.archive || false,
+  emailTemplate: c.email_template ? JSON.parse(c.email_template) : undefined,
+  bulletinTemplate: isJNIEvent(c.nom)
+    ? ('data:application/pdf;base64,' + JNI_BULLETIN_PDF)
+    : (c.bulletin_template || undefined),
+  logisticsTemplate: (c.logistics_template && c.logistics_template.length > 200) 
+    ? c.logistics_template 
+    : (isJNIEvent(c.nom) ? ('data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL) : undefined),
   participants: allParticipants
     .filter((p: any) => p.congres_id === c.id)
     .map(normalizeParticipant)
@@ -149,9 +164,17 @@ export default function Dashboard() {
 
   // ── Modale Email Settings ──
   const [emailSettingsOpen, setEmailSettingsOpen] = useState(false);
+  const [editingCongresId, setEditingCongresId] = useState<string | null>(null);
+  const [tempBulletin, setTempBulletin] = useState<string | null>(null);
+  const [tempLogistics, setTempLogistics] = useState<string | null>(null);
   const [emailTemplate, setEmailTemplate] = useState({
-    subject: "Proposition Logistique - {CONGRES}",
-    body: "Bonjour {NOM},\n\nDans le cadre de votre participation au congrès \"{CONGRES}\", nous avons le plaisir de vous soumettre notre proposition logistique.\n\nVous trouverez en pièce jointe un PDF récapitulatif avec {NB_TRANS} option(s) de transport et {NB_HOTEL} option(s) d'hébergement.\n\nMerci d'indiquer l'Option N° qui vous convient.\n\nCordialement,\nL'équipe Logistique"
+    subject: "Mundipharma – 27es Journées Nationales d'Infectiologie 2026 – Invitation",
+    body: "Chère/Cher Dr,\n\nLe laboratoire Mundipharma a le plaisir de vous compter parmi ses invités au Congrès JNI, qui se déroulera du 18 au 20 juin 2026 à Paris au :\nPalais des Congrès de Paris\n2 Place de la Porte Maillot, 75017 Paris\n\nL’organisation logistique de votre participation nous a été confiée par le laboratoire. Afin d’organiser au mieux votre séjour, merci de bien vouloir remplir le formulaire ci-joint et nous le retourner dès réception à l’adresse suivante : keisha.khoto-thinu@twobevents.fr.\n\nNous nous tenons à votre disposition pour toute information complémentaire au 01 84 25 94 89.\n\nDans l’attente de vous lire, nous vous prions de croire, Chère/Cher Madame/Monsieur, à l’assurance de notre considération distinguée.\n\n\nKeïsha KHOTO-THINU pour le laboratoire Mundipharma"
+  });
+  
+  const [globalEmailTemplate, setGlobalEmailTemplate] = useState({
+    subject: "Mundipharma – 27es Journées Nationales d'Infectiologie 2026 – Invitation",
+    body: "Chère/Cher Dr,\n\nLe laboratoire Mundipharma a le plaisir de vous compter parmi ses invités au Congrès JNI, qui se déroulera du 18 au 20 juin 2026 à Paris au :\nPalais des Congrès de Paris\n2 Place de la Porte Maillot, 75017 Paris\n\nL’organisation logistique de votre participation nous a été confiée par le laboratoire. Afin d’organiser au mieux votre séjour, merci de bien vouloir remplir le formulaire ci-joint et nous le retourner dès réception à l’adresse suivante : keisha.khoto-thinu@twobevents.fr.\n\nNous nous tenons à votre disposition pour toute information complémentaire au 01 84 25 94 89.\n\nDans l’attente de vous lire, nous vous prions de croire, Chère/Cher Madame/Monsieur, à l’assurance de notre considération distinguée.\n\n\nKeïsha KHOTO-THINU pour le laboratoire Mundipharma"
   });
 
   // ── Recherche et Filtres ──
@@ -170,6 +193,7 @@ export default function Dashboard() {
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [dbError, setDbError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isRealtimeUpdate = useRef(false);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -397,12 +421,18 @@ export default function Dashboard() {
     setHotels(prev => { const n = [...prev]; n[idx] = { ...n[idx], [field]: val }; return n; });
   };
 
-  const saveLogistique = () => {
+  const saveLogistique = (andEmail: boolean = false) => {
     if (!currentParticipant || !selectedId) return;
+    const updatedPart: Participant = { ...currentParticipant, logistique: { transports, hotels } };
+
     updateParticipants(selectedId, ps =>
-      ps.map(p => p.id === currentParticipant.id ? { ...p, logistique: { transports, hotels } } : p)
+      ps.map(p => p.id === currentParticipant.id ? updatedPart : p)
     );
     setModalOpen(false);
+
+    if (andEmail) {
+      handleGeneratePDFAndEmail(updatedPart);
+    }
   };
 
   // ─── Gmail ───────────────────────────────────────────────────────────────────
@@ -411,27 +441,282 @@ export default function Dashboard() {
     const nb = participant.logistique?.transports.length ?? 0;
     const nbH = participant.logistique?.hotels.length ?? 0;
 
-    let subject = emailTemplate.subject
+    let subject = (selectedCongres?.emailTemplate?.subject || emailTemplate.subject)
       .replace(/{CONGRES}/g, selectedCongres?.nom ?? '');
 
-    let body = emailTemplate.body
+    let body = (selectedCongres?.emailTemplate?.body || emailTemplate.body)
       .replace(/{NOM}/g, participant.nom)
       .replace(/{CONGRES}/g, selectedCongres?.nom ?? '')
       .replace(/{NB_TRANS}/g, nb.toString())
       .replace(/{NB_HOTEL}/g, nbH.toString());
 
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${participant.email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${participant.email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
+  };
+
+  const downloadBase64File = (base64: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = base64;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+
+  const getParticipantTemplateData = (participant: Participant, congres: Congres) => {
+    const log = participant.logistique;
+    const aller = log?.transports?.[0]?.aller;
+    const retour = log?.transports?.[0]?.retour;
+    const hotel = log?.hotels?.[0];
+
+    return {
+      // Identité (Générique)
+      NOM: participant.nom.toUpperCase(),
+      PRENOM: participant.nom.split(' ')[1] || participant.nom.split(' ')[0], // Souvent NOM Prénom
+      'Prénom': participant.nom.includes(' ') ? participant.nom.split(' ').slice(1).join(' ') : '',
+      'nom': participant.nom.split(' ')[0],
+      NOM_COMPLET: participant.nom,
+      NOM_PRENOM: participant.nom,
+      EMAIL: participant.email,
+      'Adresse e-mail': participant.email,
+      Téléphone: participant.telephone || '',
+      
+      // Congrès
+      CONGRES: congres.nom,
+      "Nom de l'événement": congres.nom,
+      DATE: congres.date,
+      LIEU: congres.lieu,
+      ADRESSE: congres.adresse,
+      
+      // Acheminement Aller
+      ALLER_DEPART: aller?.lieuDepart || '',
+      ALLER_ARRIVEE: aller?.lieuArrivee || '',
+      ALLER_TYPE: aller?.type || '',
+      ALLER_NUM: aller?.numero || '',
+      ALLER_H_DEP: aller?.depart || '',
+      ALLER_H_ARR: aller?.arrivee || '',
+      'Date aller': aller?.date || '',
+      'date aller': aller?.date || '',
+      'moyen de transport aller': aller?.type === 'FLIGHT' ? 'Avion' : 'Train',
+      'gare de départ aller': aller?.lieuDepart || '',
+      'correspondance aller': aller?.correspondanceLieu || '',
+      "gare d'arrivee aller": aller?.lieuArrivee || '',
+      "gare d'arrivée aller": aller?.lieuArrivee || '',
+      'heure de depart aller': aller?.depart || '',
+      "heure d'arrivee aller": aller?.arrivee || '',
+      'reference aller': aller?.numero || '',
+
+      // Acheminement Retour
+      RETOUR_DEPART: retour?.lieuDepart || '',
+      RETOUR_ARRIVEE: retour?.lieuArrivee || '',
+      RETOUR_TYPE: retour?.type || '',
+      RETOUR_NUM: retour?.numero || '',
+      RETOUR_H_DEP: retour?.depart || '',
+      RETOUR_H_ARR: retour?.arrivee || '',
+      'date de retour': retour?.date || '',
+      'moyen de transport retour': retour?.type === 'FLIGHT' ? 'Avion' : 'Train',
+      'gare de depart retour': retour?.lieuDepart || '',
+      'correspondance retour': retour?.correspondanceLieu || '',
+      "gare d'arrivée retour": retour?.lieuArrivee || '',
+      "gare d'arrivee retour": retour?.lieuArrivee || '',
+      'heure de depart retour': retour?.depart || '',
+      "heure d'arrivee retour": retour?.arrivee || '',
+      'reference retour': retour?.numero || '',
+
+      // Hotel
+      HOTEL_NOM: hotel?.nom || '',
+      CHECK_IN: hotel?.checkIn || '',
+      CHECK_OUT: hotel?.checkOut || '',
+      'Nuit du 18 juin': hotel?.checkIn?.includes('18/06') ? 'OUI' : '',
+      'Nuit du 19 juin': hotel?.checkOut?.includes('20/06') ? 'OUI' : ''
+    };
+  };
+
+  const fillAndDownloadTemplate = async (templateB64: string, participant: Participant, congres: Congres, type: string) => {
+    let filename = `${type}_${participant.nom.replace(/\s+/g, '_')}`;
+    // Si c'est le modèle par défaut ou JNI
+    if (templateB64.includes(JNI_EXCEL.substring(0, 20)) || congres.nom?.toUpperCase().includes('JNI')) {
+      if (type === 'Proposition' || type === 'Logistique') filename = `Modele_JNI_2026_REMPLI_${participant.nom.replace(/\s+/g, '_')}`;
+      if (type === 'Bulletin') filename = `Bulletin_Invitation_JNI_2026_${participant.nom.replace(/\s+/g, '_')}`;
+    }
+    const data = getParticipantTemplateData(participant, congres);
+
+    const isXlsx = templateB64.includes('spreadsheetml') || templateB64.includes('excel');
+    const isDocx = templateB64.includes('wordprocessingml') || templateB64.includes('officedocument.word');
+    const isPdf = templateB64.includes('application/pdf');
+
+    if (isXlsx) {
+      try {
+        console.log("🛠️ Remplissage Excel par détection de colonnes...");
+        const base64Data = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
+        const wb = XLSX.read(base64Data, { type: 'base64' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+
+        // 1. Détection des en-têtes
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z100');
+        const headerMap: Record<string, number> = {};
+        
+        // On scanne les 100 premières lignes pour trouver les colonnes ou étiquettes
+        for (let r = 0; r <= 100; r++) {
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell && cell.v) {
+              const val = String(cell.v).trim().toLowerCase();
+              Object.keys(data).forEach(k => {
+                // Correspondance exacte ou inclusion pour "Gare de départ aller" etc.
+                if (k.toLowerCase() === val || val === k.toLowerCase() + ':' || val.includes(k.toLowerCase())) {
+                  headerMap[k] = c;
+                }
+              });
+            }
+          }
+        }
+
+        if (Object.keys(headerMap).length > 0) {
+          // On ajoute les données sur la ligne juste après les en-têtes ou la première ligne vide
+          let rowToFill = 1;
+          // On cherche la première ligne vide en colonne A (ou première colonne trouvée)
+          const firstCol = headerMap['NOM'] || 0;
+          while (ws[XLSX.utils.encode_cell({ r: rowToFill, c: firstCol })]?.v) {
+            rowToFill++;
+          }
+          
+          Object.entries(headerMap).forEach(([key, col]) => {
+            const addr = XLSX.utils.encode_cell({ r: rowToFill, c: col });
+            ws[addr] = { v: data[key], t: 's' };
+          });
+          console.log(`✅ Ligne ${rowToFill + 1} remplie via en-têtes.`);
+        }
+
+        // 2. Fallback: Remplacement de placeholders (si présents)
+        Object.keys(ws).forEach(addr => {
+          if (addr[0] === '!') return;
+          const cell = ws[addr];
+          if (cell && cell.v && typeof cell.v === 'string') {
+            let newVal = cell.v;
+            let replaced = false;
+            Object.entries(data).forEach(([key, val]) => {
+              const patterns = [`{${key}}`, `«${key}»`, `{{${key}}}`];
+              patterns.forEach(p => {
+                if (newVal.includes(p)) {
+                  newVal = newVal.replace(p, val || '');
+                  replaced = true;
+                }
+              });
+            });
+            if (replaced) cell.v = newVal;
+          }
+        });
+
+        const outB64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+        downloadBase64File(`data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${outB64}`, `${filename}.xlsx`);
+      } catch (err) {
+        console.error("❌ EXCEL Fill Error:", err);
+        downloadBase64File(templateB64, `${filename}.xlsx`);
+      }
+    } else if (isDocx) {
+      console.log("📄 Tentative de remplissage Word (Docx)...");
+      try {
+        const base64Part = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
+        const binaryString = window.atob(base64Part);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const report = await createReport({
+          template: bytes,
+          cmdDelimiter: ['«', '»'],
+          data: data,
+          noSandbox: true,
+          fixEmptyTags: true
+        } as any);
+
+        const blob = new Blob([report], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log("✅ Word personnalisé téléchargé.");
+      } catch (err) {
+        console.error("❌ WORD Fill Error:", err);
+        // Fallback brut
+        downloadBase64File(templateB64, `${filename}.docx`);
+      }
+    } else if (isPdf) {
+      console.log("🛠️ Téléchargement du modèle PDF...");
+      downloadBase64File(templateB64, `${filename}.pdf`);
+    }
   };
 
   // ─── Génération PDF + Gmail ──────────────────────────────────────────────────
   const handleGeneratePDFAndEmail = async (participant: Participant) => {
     if (!participant.logistique || !selectedId) return;
     setLoadingIds(prev => new Set(prev).add(participant.id));
+
+    console.log("🚀 Lancement export pour:", participant.nom);
+    console.log("📅 Congrès:", selectedCongres?.nom);
+    console.log("📂 Templates présents:", { 
+      prop: !!selectedCongres?.logisticsTemplate, 
+      bulletin: !!selectedCongres?.bulletinTemplate 
+    });
+
     try {
       if (selectedCongres) {
-        generateInvitationPDF(participant.nom, selectedCongres, participant.logistique);
+        let templateUsed = false;
+        const isJNI = isJNIEvent(selectedCongres.nom);
+        
+        console.log(`🧐 Analyse JNI pour "${selectedCongres.nom}":`, isJNI ? "OUI" : "NON");
+
+        // 1. Modèle Logistique / Proposition (Excel)
+        if (selectedCongres.logisticsTemplate) {
+          console.log("🟢 Remplissage du modèle Excel (Logistique/Proposition)...");
+          await fillAndDownloadTemplate(selectedCongres.logisticsTemplate, participant, selectedCongres, 'Proposition');
+          templateUsed = true;
+        } else if (isJNI) {
+          // Sécurité JNI si le template n'est pas chargé en base
+          const jniB64 = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL;
+          console.log("🟠 JNI fallback (Excel)...");
+          await fillAndDownloadTemplate(jniB64, participant, selectedCongres, 'Proposition');
+          templateUsed = true;
+        }
+        
+        // 2. Modèle Bulletin (PDF pour JNI, Word sinon)
+        if (selectedCongres.bulletinTemplate) {
+          const typeLabel = selectedCongres.bulletinTemplate.includes('pdf') ? 'PDF' : 'Word';
+          console.log(`🟢 Téléchargement/Remplissage du bulletin (${typeLabel})...`);
+          await fillAndDownloadTemplate(selectedCongres.bulletinTemplate, participant, selectedCongres, 'Bulletin');
+          templateUsed = true;
+        } else if (isJNI) {
+          // Sécurité JNI si le template n'est pas chargé en base
+          const jniB64 = 'data:application/pdf;base64,' + JNI_BULLETIN_PDF;
+          console.log("🟠 JNI fallback (PDF Bulletin)...");
+          await fillAndDownloadTemplate(jniB64, participant, selectedCongres, 'Bulletin');
+          templateUsed = true;
+        }
+
+        if (!templateUsed) {
+          console.log("⚠️ Aucun template trouvé, génération du PDF standard.");
+          generateInvitationPDF(participant.nom, selectedCongres, participant.logistique);
+        }
       }
-      if (participant.email) openGmailDraft(participant);
+      
+      if (participant.email) {
+        console.log("📧 Ouverture Gmail...");
+        setTimeout(() => {
+          openGmailDraft(participant);
+        }, 500);
+      }
+
       updateParticipants(selectedId, ps =>
         ps.map(p => p.id === participant.id ? { ...p, statut: 'ATTENTE_REPONSE' } : p)
       );
@@ -509,10 +794,72 @@ export default function Dashboard() {
     }));
 
     // 3. Générer le fichier
-    const ws = XLSX.utils.json_to_sheet(dataExcel);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "A Réserver");
-    XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
+    const isJNI = isJNIEvent(selectedCongres.nom);
+    const templateB64 = selectedCongres.logisticsTemplate || (isJNI ? 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL : null);
+
+    if (templateB64 && templateB64.includes('spreadsheetml')) {
+      // UTILISATION DU MODÈLE (ex: JNI 2026)
+      try {
+        console.log("🛠️ Export via modèle agence...");
+        const base64Data = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
+        const wb = XLSX.read(base64Data, { type: 'base64' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+
+        // Détection des en-têtes (on utilise le premier participant pour avoir les clés)
+        const sampleData = getParticipantTemplateData(aExporter[0], selectedCongres);
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z100');
+        const headerMap: Record<string, number> = {};
+        
+        // On scanne les 100 premières lignes pour trouver les colonnes
+        for (let r = 0; r <= 100; r++) {
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell && cell.v) {
+              const val = String(cell.v).trim().toLowerCase();
+              Object.keys(sampleData).forEach(k => {
+                if (k.toLowerCase() === val || val.includes(k.toLowerCase())) {
+                  headerMap[k] = c;
+                }
+              });
+            }
+          }
+        }
+
+        if (Object.keys(headerMap).length > 0) {
+          // On ajoute chaque participant sur une nouvelle ligne
+          let startRow = 1;
+          const firstCol = headerMap['NOM'] || 0;
+          while (ws[XLSX.utils.encode_cell({ r: startRow, c: firstCol })]?.v) {
+            startRow++;
+          }
+
+          aExporter.forEach((p, index) => {
+            const rowData = getParticipantTemplateData(p, selectedCongres);
+            const currentRow = startRow + index;
+            Object.entries(headerMap).forEach(([key, col]) => {
+              const addr = XLSX.utils.encode_cell({ r: currentRow, c: col });
+              ws[addr] = { v: rowData[key as keyof typeof rowData], t: 's' };
+            });
+          });
+          
+          console.log(`✅ ${aExporter.length} participants ajoutés au modèle.`);
+        }
+
+        XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
+      } catch (err) {
+        console.error("❌ Erreur remplissage modèle agence, fallback standard:", err);
+        const ws = XLSX.utils.json_to_sheet(dataExcel);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "A Réserver");
+        XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
+      }
+    } else {
+      // GÉNÉRATION STANDARD
+      const ws = XLSX.utils.json_to_sheet(dataExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "A Réserver");
+      XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
+    }
 
     // 4. Marquer comme exportés dans la base
     updateParticipants(selectedCongres.id, ps =>
@@ -614,8 +961,8 @@ export default function Dashboard() {
         let finalCongres: Congres[] = [];
         let finalHistory: ExportHistory[] = [];
         let finalTemplate = {
-          subject: "Proposition Logistique - {CONGRES}",
-          body: "Bonjour {NOM},\n\nDans le cadre de votre participation au congrès \"{CONGRES}\", nous avons le plaisir de vous soumettre notre proposition logistique.\n\nVous trouverez en pièce jointe un PDF récapitulatif avec {NB_TRANS} option(s) de transport et {NB_HOTEL} option(s) d'hébergement.\n\nMerci d'indiquer l'Option N° qui vous convient.\n\nCordialement,\nL'équipe Logistique"
+          subject: "Mundipharma – 27es Journées Nationales d'Infectiologie 2026 – Invitation",
+          body: "Chère/Cher Dr,\n\nLe laboratoire Mundipharma a le plaisir de vous compter parmi ses invités au Congrès JNI, qui se déroulera du 18 au 20 juin 2026 à Paris au :\nPalais des Congrès de Paris\n2 Place de la Porte Maillot, 75017 Paris\n\nL’organisation logistique de votre participation nous a été confiée par le laboratoire. Afin d’organiser au mieux votre séjour, merci de bien vouloir remplir le formulaire ci-joint et nous le retourner dès réception à l’adresse suivante : keisha.khoto-thinu@twobevents.fr.\n\nNous nous tenons à votre disposition pour toute information complémentaire au 01 84 25 94 89.\n\nDans l’attente de vous lire, nous vous prions de croire, Chère/Cher Madame/Monsieur, à l’assurance de notre considération distinguée.\n\n\nKeïsha KHOTO-THINU pour le laboratoire Mundipharma"
         };
 
         if (dataCongres) {
@@ -623,7 +970,15 @@ export default function Dashboard() {
           if (dataHistory) {
             finalHistory = (dataHistory as ExportHistoryRow[]).map(normalizeHistoryRow);
           }
-          if (dataSettings?.email_template) finalTemplate = dataSettings.email_template;
+          if (dataSettings?.email_template) {
+            const dbTemplate = dataSettings.email_template;
+            // Si le template en base est l'ancien (générique), on le remplace par le nouveau Mundipharma
+            if (dbTemplate.subject && dbTemplate.subject.includes("Proposition Logistique")) {
+              // On garde finalTemplate qui est déjà initialisé avec Mundipharma
+            } else {
+              finalTemplate = dbTemplate;
+            }
+          }
         }
 
         setCongres(finalCongres);
@@ -639,10 +994,87 @@ export default function Dashboard() {
     initData();
   }, []);
 
+  // ─── Realtime Supabase ───
+  useEffect(() => {
+    if (loading) return;
+    
+    console.log("⚡ [Realtime] Initialisation du canal participants...");
+    const channel = supabase
+      .channel('realtime-participants')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'participants' 
+      }, (payload: any) => {
+        if (!payload.new || !payload.new.id) return;
+        
+        const updatedPart = normalizeParticipant(payload.new);
+        const congresId = payload.new.congres_id;
+
+        // 1. Désactiver temporairement la synchro montante pour éviter la boucle
+        isRealtimeUpdate.current = true;
+        
+        // 2. Mettre à jour l'état global
+        setCongres(prev => prev.map(c => 
+          c.id === congresId 
+            ? { 
+                ...c, 
+                participants: c.participants.some(p => p.id === updatedPart.id)
+                  ? c.participants.map(p => p.id === updatedPart.id ? updatedPart : p)
+                  : [...c.participants, updatedPart]
+              }
+            : c
+        ));
+
+        // 3. Mettre à jour les vues ouvertes si c'est le même participant
+        setCurrentParticipant(prev => prev?.id === updatedPart.id ? updatedPart : prev);
+        if (updatedPart.logistique) {
+          setTransports(prev => currentParticipant?.id === updatedPart.id ? updatedPart.logistique!.transports : prev);
+          setHotels(prev => currentParticipant?.id === updatedPart.id ? updatedPart.logistique!.hotels : prev);
+        }
+        setParticipantForDetails(prev => prev?.id === updatedPart.id ? updatedPart : prev);
+        
+        // 4. Feedback visuel
+        setSyncStatus('SUCCESS');
+        setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 2000);
+      })
+      .subscribe();
+
+    // -- Canal pour la table congres (Modèles et réglages) --
+    const congressChannel = supabase
+      .channel('realtime-congres')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'congres' 
+      }, (payload: any) => {
+        if (!payload.new || !payload.new.id) return;
+        const updatedRaw = payload.new;
+        setCongres(prev => {
+          // On récupère tous les participants actuels de l'état pour la normalisation
+          const currentAllParticipants = prev.flatMap(c => c.participants);
+          const normalized = normalizeCongres(updatedRaw, currentAllParticipants);
+          return prev.map(c => c.id === updatedRaw.id ? normalized : c);
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(congressChannel);
+    };
+  }, [loading, currentParticipant?.id]);
+
   // ─── Synchronisation Supabase Uniquement ───
   React.useEffect(() => {
-    if (loading) return; // Ne pas synchroniser tant que le premier chargement n'est pas fini
+    if (loading) return;
     if (!initializedRef.current) return;
+    
+    // Si c'est une mise à jour venant du Realtime, on ne la repousse pas
+    if (isRealtimeUpdate.current) {
+      isRealtimeUpdate.current = false;
+      return;
+    }
 
     // 2. Synchronisation en ligne (Supabase - Tables V2)
     const syncToDB = async () => {
@@ -676,7 +1108,10 @@ export default function Dashboard() {
           date_fin: c.dateFin,
           lieu: c.lieu,
           adresse: c.adresse,
-          archive: c.archive || false
+          archive: c.archive || false,
+          email_template: c.emailTemplate || null,
+          bulletin_template: c.bulletinTemplate || null,
+          logistics_template: c.logisticsTemplate || null
         }));
         if (congresPayload.length > 0) {
           const { error: errCongres } = await supabase.from('congres').upsert(congresPayload, { onConflict: 'id' });
@@ -822,10 +1257,14 @@ export default function Dashboard() {
             <Archive className="w-5 h-5" /> Événements Archivés
           </button>
           <button
-            onClick={() => setEmailSettingsOpen(true)}
+            onClick={() => {
+              setEditingCongresId(null);
+              setEmailTemplate(globalEmailTemplate);
+              setEmailSettingsOpen(true);
+            }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-100 transition-all font-medium"
           >
-            <Mail className="w-5 h-5" /> Emails Settings
+            <Mail className="w-5 h-5" /> Emails Settings (Global)
           </button>
 
           <button
@@ -851,19 +1290,43 @@ export default function Dashboard() {
             {congres.filter(c => !c.archive).map(c => {
               const isSelected = c.id === selectedId;
               return (
-                <button
+                <div
                   key={c.id}
                   onClick={() => { setSelectedId(c.id); setViewMode('BOARD'); }}
-                  className={`w-full text-left px-4 py-3 flex items-center gap-3 rounded-xl transition-all ${isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-50'
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 rounded-xl transition-all group cursor-pointer ${isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-50'
                     }`}
                 >
-                  <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-600 animate-pulse' : 'bg-gray-300'}`} />
-                  <span className="truncate text-sm flex-1">{c.nom}</span>
-                  <Archive
-                    className="w-3.5 h-3.5 text-gray-300 hover:text-orange-500 transition-colors"
-                    onClick={(e) => handleArchiveCongres(e, c.id)}
-                  />
-                </button>
+                  <div className={`w-2 h-2 rounded-full shadow-sm ${isSelected ? 'bg-blue-600 animate-pulse' : 'bg-gray-300'}`} />
+                  <span className="truncate text-sm flex-1 flex items-center gap-2">
+                    {c.nom}
+                    {(c.bulletinTemplate || c.logisticsTemplate) && (
+                      <FileText className="w-3 h-3 text-emerald-500" />
+                    )}
+                  </span>
+                  <div className="flex gap-2 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCongresId(c.id);
+                        setEmailTemplate(c.emailTemplate || globalEmailTemplate);
+                        setTempBulletin(c.bulletinTemplate || null);
+                        setTempLogistics(c.logisticsTemplate || null);
+                        setEmailSettingsOpen(true);
+                      }}
+                      className="p-1 hover:text-blue-600 transition-colors"
+                      title="Modifier le modèle d'email pour cet événement"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleArchiveCongres(e, c.id)}
+                      className="p-1 hover:text-orange-500 transition-colors"
+                      title="Archiver"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1188,9 +1651,28 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                    <Filter className="w-4 h-4" /> Filtrer
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                      setEditingCongresId(selectedCongres.id);
+                      setEmailTemplate(selectedCongres.emailTemplate || globalEmailTemplate);
+                      setTempBulletin(selectedCongres.bulletinTemplate || null);
+                      setTempLogistics(selectedCongres.logisticsTemplate || null);
+                      setEmailSettingsOpen(true);
+                    }}
+                    className={`px-6 py-4 rounded-[20px] font-black text-xs transition-all flex items-center gap-3 shadow-xl ${
+                      (selectedCongres.bulletinTemplate || selectedCongres.logisticsTemplate)
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    <FileText className="w-5 h-5" />
+                    {(selectedCongres.bulletinTemplate || selectedCongres.logisticsTemplate) 
+                      ? "MODÈLES PRÊTS (DOCX/XLSX)" 
+                      : "CONFIGURER MODÈLES"}
+                  </button>
+                  <button className="px-6 py-4 bg-white border border-gray-200 rounded-[20px] text-xs font-black text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+                    <Filter className="w-4 h-4" /> FILTRER
                   </button>
                 </div>
               </div>
@@ -2211,8 +2693,29 @@ export default function Dashboard() {
               <button onClick={() => setModalOpen(false)} className="flex-1 py-5 bg-white border border-gray-200 text-gray-700 rounded-3xl font-black text-sm hover:shadow-lg transition-all">
                 Annuler
               </button>
-              <button onClick={saveLogistique} className="flex-2 w-full max-w-sm py-5 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-xl shadow-blue-200 hover:translate-y-[-2px] transition-all">
-                Enregistrer le plan
+              <button onClick={() => saveLogistique(true)} className="flex-2 w-full max-w-sm py-5 bg-emerald-600 text-white rounded-3xl font-black text-sm shadow-xl shadow-emerald-100 hover:translate-y-[-2px] transition-all flex items-center justify-center gap-2">
+                <MailCheck className="w-5 h-5" /> Enregistrer & Envoyer
+              </button>
+              <button 
+                onClick={async () => {
+                  const cong = congres.find(c => c.id === selectedId);
+                  if (!cong || !currentParticipant) return;
+                  console.log("🧪 Test Manuel lancé pour :", currentParticipant.nom);
+                  const isJNI = isJNIEvent(cong.nom);
+                  const bull = cong.bulletinTemplate || (isJNI ? 'data:application/pdf;base64,' + JNI_BULLETIN_PDF : null);
+                  const logi = cong.logisticsTemplate || (isJNI ? 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL : null);
+
+                  if (bull) await fillAndDownloadTemplate(bull, currentParticipant, cong, 'Test_Bulletin');
+                  if (logi) await fillAndDownloadTemplate(logi, currentParticipant, cong, 'Test_Logistique');
+                  if (!bull && !logi) alert("Aucun modèle configuré.");
+                }}
+                className="px-6 py-5 bg-emerald-50 text-emerald-600 rounded-3xl font-black text-xs hover:bg-emerald-100 transition-all flex items-center gap-2"
+                title="Tester le remplissage Docx/Xlsx"
+              >
+                <FileText className="w-4 h-4" /> TESTER
+              </button>
+              <button onClick={() => saveLogistique(false)} className="flex-1 py-5 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-xl shadow-blue-100 hover:translate-y-[-2px] transition-all">
+                Enregistrer
               </button>
             </div>
           </div>
@@ -2358,43 +2861,169 @@ export default function Dashboard() {
       {emailSettingsOpen && (
         <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col scale-in-center">
-            <div className="p-10 border-b border-gray-50">
-              <h3 className="text-2xl font-black italic">Paramètres Email</h3>
-              <p className="text-gray-400 text-sm font-medium mt-1">Personnalisez votre modèle de message Gmail.</p>
+            <div className="p-10 border-b border-gray-50 flex justify-between items-center bg-blue-50/30">
+              <div>
+                <h3 className="text-2xl font-black italic">
+                  {editingCongresId ? `Modèle : ${congres.find(c => c.id === editingCongresId)?.nom}` : "Paramètres Email Globaux"}
+                </h3>
+                <p className="text-gray-400 text-sm font-medium mt-1">Personnalisez votre modèle de message Gmail.</p>
+              </div>
+              <button onClick={() => setEmailSettingsOpen(false)} className="p-4 bg-white text-gray-400 rounded-2xl hover:bg-red-50 hover:text-red-500 transition-all shadow-sm">
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <div className="p-10 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Objet de l'email</label>
-                <input
-                  type="text"
-                  className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
-                  value={emailTemplate.subject}
-                  onChange={e => setEmailTemplate(prev => ({ ...prev, subject: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Corps du message</label>
-                <textarea
-                  className="w-full bg-gray-50 border-none rounded-2xl p-6 text-sm font-medium focus:ring-2 focus:ring-blue-500/10 focus:outline-none min-h-[250px]"
-                  value={emailTemplate.body}
-                  onChange={e => setEmailTemplate(prev => ({ ...prev, body: e.target.value }))}
-                />
-                <div className="flex flex-wrap gap-2 mt-2 px-2">
-                  {["{NOM}", "{CONGRES}", "{NB_TRANS}", "{NB_HOTEL}"].map(tag => (
-                    <span key={tag} className="text-[9px] font-black bg-blue-50 text-blue-500 px-2 py-1 rounded-md">{tag}</span>
-                  ))}
-                  <span className="text-[9px] text-gray-300 italic self-center ml-2">← Tags automatiques</span>
+            <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto">
+              {/* Section Email */}
+              <div className="space-y-6">
+                <h4 className="text-sm font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
+                  <Mail className="w-4 h-4" /> MODÈLE D'EMAIL
+                </h4>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Objet de l'email</label>
+                    <input
+                      type="text"
+                      className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                      value={emailTemplate.subject}
+                      onChange={e => setEmailTemplate(prev => ({ ...prev, subject: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Corps du message</label>
+                    <textarea
+                      className="w-full bg-gray-50 border-none rounded-2xl p-6 text-sm font-medium focus:ring-2 focus:ring-blue-500/10 focus:outline-none min-h-[200px]"
+                      value={emailTemplate.body}
+                      onChange={e => setEmailTemplate(prev => ({ ...prev, body: e.target.value }))}
+                    />
+                    <div className="flex flex-wrap gap-2 mt-2 px-2">
+                      {["{NOM}", "{CONGRES}", "{NB_TRANS}", "{NB_HOTEL}"].map(tag => (
+                        <span key={tag} className="text-[9px] font-black bg-blue-50 text-blue-500 px-2 py-1 rounded-md">{tag}</span>
+                      ))}
+                      <span className="text-[9px] text-gray-300 italic self-center ml-2">← Tags automatiques</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Section Fichiers Modèles uniquement pour événement */}
+              {editingCongresId && (
+                <div className="space-y-6 pt-8 border-t border-gray-50">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> MODÈLES DE DOCUMENTS (.docx, .xlsx)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Bulletin d'invitation</label>
+                      <div className="relative group aspect-video bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden hover:border-blue-400 transition-all">
+                        {tempBulletin ? (
+                          <div className="flex flex-col items-center p-4">
+                            <FileCheck className="w-10 h-10 text-emerald-500 mb-2" />
+                            <p className="text-[10px] font-bold text-gray-500">Document Chargé</p>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); downloadBase64File(tempBulletin!, 'Bulletin_Template.xlsx'); }}
+                              className="mt-2 text-[8px] font-black text-blue-600 underline uppercase"
+                            >
+                              Vérifier le fichier
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setTempBulletin(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-center p-6">
+                            <FileUp className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-[10px] font-bold text-gray-400">IMPORTER LE .DOCX / .XLSX</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept=".docx,.xlsx,.xls"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (evt) => setTempBulletin(evt.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Proposition Logistique</label>
+                      <div className="relative group aspect-video bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden hover:border-emerald-400 transition-all">
+                        {tempLogistics ? (
+                          <div className="flex flex-col items-center p-4">
+                            <FileCheck className="w-10 h-10 text-emerald-500 mb-2" />
+                            <p className="text-[10px] font-bold text-gray-500">Document Chargé</p>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); downloadBase64File(tempLogistics!, 'Proposition_Template.xlsx'); }}
+                              className="mt-2 text-[8px] font-black text-emerald-600 underline uppercase"
+                            >
+                              Vérifier le fichier
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setTempLogistics(null); }} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-center p-6">
+                            <FilePlus2 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-[10px] font-bold text-gray-400">IMPORTER LE .DOCX / .XLSX</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept=".docx,.xlsx,.xls"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (evt) => setTempLogistics(evt.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex flex-col gap-3">
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Balises automatiques disponibles :</p>
+                    <div className="flex flex-wrap gap-2">
+                      {["{NOM}", "{PRENOM}", "{DATE}", "{LIEU}", "{ALLER_DEPART}", "{RETOUR_DEPART}", "{HOTEL_NOM}"].map(tag => (
+                        <span key={tag} className="text-[9px] font-bold bg-white text-blue-500 border border-blue-100 px-2 py-1 rounded-lg shadow-sm">{tag}</span>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-blue-400 italic">Le logiciel remplira ces cases automatiquement si elles sont présentes dans votre Excel.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-10 bg-gray-50/50 flex gap-4">
               <button
+                onClick={() => {
+                  if (editingCongresId) {
+                    setCongres(prev => prev.map(c => c.id === editingCongresId ? { ...c, emailTemplate, bulletinTemplate: tempBulletin || undefined, logisticsTemplate: tempLogistics || undefined } : c));
+                  } else {
+                    setGlobalEmailTemplate(emailTemplate);
+                  }
+                  setEmailSettingsOpen(false);
+                }}
+                className="flex-1 py-5 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-xl shadow-blue-200 hover:translate-y-[-2px] transition-all"
+              >
+                {editingCongresId ? "Enregistrer pour cet événement" : "Enregistrer Globalement"}
+              </button>
+              <button
                 onClick={() => setEmailSettingsOpen(false)}
                 className="flex-1 py-5 bg-white border border-gray-200 text-gray-700 rounded-3xl font-black text-sm hover:shadow-lg transition-all"
               >
-                Fermer
+                Annuler
               </button>
             </div>
           </div>

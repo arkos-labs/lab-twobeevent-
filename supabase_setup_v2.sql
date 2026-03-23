@@ -9,6 +9,9 @@ CREATE TABLE public.congres (
   lieu text,
   adresse text,
   archive boolean DEFAULT false,
+  email_template jsonb,
+  bulletin_template text,
+  logistics_template text,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -45,7 +48,7 @@ CREATE TABLE public.settings (
 
 -- Initialisation de la ligne de paramètre
 INSERT INTO public.settings (id, email_template) 
-VALUES (1, '{"subject": "Proposition Logistique - {CONGRES}", "body": "Bonjour {NOM}..."}'::jsonb) 
+VALUES (1, '{"subject": "Mundipharma – 27es Journées Nationales d\'Infectiologie 2026 – Invitation", "body": "Chère/Cher Dr,\\n\\nLe laboratoire Mundipharma a le plaisir de vous compter parmi ses invités au Congrès JNI, qui se déroulera du 18 au 20 juin 2026 à Paris au :\\nPalais des Congrès de Paris\\n2 Place de la Porte Maillot, 75017 Paris\\n\\nL’organisation logistique de votre participation nous a été confiée par le laboratoire. Afin d’organiser au mieux votre séjour, merci de bien vouloir remplir le formulaire ci-joint et nous le retourner dès réception à l’adresse suivante : keisha.khoto-thinu@twobevents.fr.\\n\\nNous nous tenons à votre disposition pour toute information complémentaire au 01 84 25 94 89.\\n\\nDans l’attente de vous lire, nous vous prions de croire, Chère/Cher Madame/Monsieur, à l’assurance de notre considération distinguée.\\n\\n\\nKeïsha KHOTO-THINU pour le laboratoire Mundipharma"}'::jsonb) 
 ON CONFLICT (id) DO NOTHING;
 
 -- Désactivation du Row Level Security 

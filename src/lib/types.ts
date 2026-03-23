@@ -71,6 +71,12 @@ export interface Congres {
   heure?: string;
   participants: Participant[];
   archive?: boolean;
+  emailTemplate?: {
+    subject: string;
+    body: string;
+  };
+  bulletinTemplate?: string;   // Base64 Docx/XLSX
+  logisticsTemplate?: string;  // Base64 Docx/XLSX
 }
 
 export interface ExportHistory {

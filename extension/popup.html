@@ -1,8 +1,11 @@
-<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Twobeevent Capture</title>
     <style>
       body {
         width: 350px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
         padding: 15px;
         background-color: #f8fafc;
         border-radius: 12px;
@@ -38,6 +41,17 @@
       .notes-area {
         width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; font-size: 11px;
         color: #475569; background: #f8fafc; resize: none; min-height: 48px; box-sizing: border-box;
+      }
+      
+      /* Dark Mode Support */
+      @media (prefers-color-scheme: dark) {
+        body { background-color: #0f172a; color: #f8fafc; }
+        .card { background: #1e293b; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        h1 { color: #f1f5f9; }
+        .value { color: #e2e8f0; }
+        .segment-input input { background-color: #334155; border-color: #475569; color: #f8fafc; }
+        .notes-area { background-color: #334155; border-color: #475569; color: #cbd5e1; }
+        .section-title { border-bottom-color: #1e293b; }
       }
     </style>
   </head>

@@ -8,7 +8,9 @@
     "*://*.sncf-connect.com/*",
     "*://*.google.com/travel/*",
     "*://*.booking.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://*.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -19,7 +21,10 @@
       "matches": [
         "*://*.sncf-connect.com/*",
         "*://*.google.com/travel/*",
-        "*://*.booking.com/*"
+        "*://*.booking.com/*",
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "https://*.vercel.app/*"
       ],
       "js": ["content.js"]
     }
