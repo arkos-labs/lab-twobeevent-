@@ -31,51 +31,72 @@ function extractAllDetails() {
   
   console.log("[Twobeevent] Début extraction ultra-large...");
 
-  // --- LOGIQUE SNCF CONNECT ---
+  // --- LOGIQUE SNCF CONNECT RÉVOLUTIONNAIRE ---
   if (url.includes("sncf-connect.com")) {
-    console.log("[Twobeevent] Analyse SNCF Connect...");
-
-    // On cherche les horaires du type "08h12" ou "08:12"
-    const times = Array.from(fullText.matchAll(/(\d{1,2}[h:]\d{2})/g)).map(m => m[1].replace('h', ':'));
+    console.log("[Twobeevent] Analyse Segmentée SNCF...");
     
-    // On essaye de trouver les gares (souvent en début de ligne après l'horaire dans le détail)
-    const stations = [];
-    const lines = fullText.split('\n');
-    lines.forEach(line => {
-      if (line.match(/\d{1,2}[h:]\d{2}/) && line.length > 10) {
-        stations.push(line.replace(/\d{1,2}[h:]\d{2}/, '').trim());
-      }
-    });
+    // On divise par "ALLER" et "RETOUR" si présents
+    const sections = fullText.split(/(?=RETOUR|VOYAGE DE RETOUR)/i);
+    const allerText = sections[0];
+    const retourText = sections[1] || "";
 
-    // RECHERCHE ULTRA-AGGRESSIVE (Numéros de Train, Vol, Bus, Car)
-    const trainKeywords = "TGV|OUIGO|TER|INTERCITES|INOUI|ICE|LYRIA|THALYS|EUROSTAR|CAR|BUS|VOL|FLIGHT|TRAIN";
-    const trainReg = new RegExp(`\\b(${trainKeywords})?\\s*(\\d{4,6})\\b`, "gi");
-    const allFindings = [];
-    let match;
-    while ((match = trainReg.exec(fullText)) !== null) {
-      const type = (match[1] || "TRAIN").toUpperCase();
-      const num = match[2];
-      if (!["2024", "2025", "2026"].includes(num)) {
-        allFindings.push(`${type} ${num}`);
-      }
-    }
-    const uniqueTrainNums = [...new Set(allFindings)];
-    
-    if (times.length >= 2) {
-      data.transport = {
-        aller: {
-          type: "TRAIN",
-          lieuDepart: stations[0] || "Inconnu",
-          lieuArrivee: stations[stations.length - 1] || "Inconnu",
-          depart: times[0],
-          arrivee: times[times.length - 1],
-          numero: uniqueTrainNums.join(' / '),
-          date: "", 
-          correspondanceLieu: ""
-        },
-        site: "SNCF Connect",
-        type: "TRAIN"
-      };
+    const extractSegments = (text) => {
+        // Un segment commence souvent par un horaire suivi d'une ville
+        // On cherche les blocs de type "HH:mm Ville ... Train N°"
+        const segs = [];
+        const lines = text.split('\n').filter(l => l.trim().length > 0);
+        
+        let currentSeg = null;
+        const trainKeywords = "TGV|OUIGO|TER|INTERCITES|INOUI|ICE|LYRIA|THALYS|EUROSTAR|CAR|BUS|VOL|FLIGHT|TRAIN";
+        const trainReg = new RegExp(`\\b(${trainKeywords})?\\s*(\\d{4,6})\\b`, "i");
+
+        lines.forEach(line => {
+            const timeMatch = line.match(/(\d{1,2}[h:]\d{2})/);
+            if (timeMatch) {
+                const time = timeMatch[1].replace('h', ':');
+                const ville = line.replace(timeMatch[0], '').trim();
+                
+                if (!currentSeg) {
+                    currentSeg = { depart: time, lieuDepart: ville, numero: "" };
+                } else {
+                    currentSeg.arrivee = time;
+                    currentSeg.lieuArrivee = ville;
+                    segs.push(currentSeg);
+                    // On commence le segment suivant avec l'arrivée du précédent (correspondance)
+                    currentSeg = { depart: time, lieuDepart: ville, numero: "" };
+                }
+            }
+            
+            const trainMatch = line.match(trainReg);
+            if (trainMatch && currentSeg) {
+                currentSeg.numero = `${(trainMatch[1] || "TRAIN").toUpperCase()} ${trainMatch[2]}`;
+            }
+        });
+        return segs.filter(s => s.arrivee);
+    };
+
+    const allerSegs = extractSegments(allerText);
+    const retourSegs = extractSegments(retourText);
+
+    if (allerSegs.length > 0) {
+        data.transport = {
+            aller: {
+                ...allerSegs[0],
+                lieuArrivee: allerSegs[allerSegs.length-1].lieuArrivee,
+                arrivee: allerSegs[allerSegs.length-1].arrivee,
+                segments: allerSegs,
+                numero: [...new Set(allerSegs.map(s => s.numero).filter(n => !!n))].join(' / ')
+            },
+            retour: retourSegs.length > 0 ? {
+                ...retourSegs[0],
+                lieuArrivee: retourSegs[retourSegs.length-1].lieuArrivee,
+                arrivee: retourSegs[retourSegs.length-1].arrivee,
+                segments: retourSegs,
+                numero: [...new Set(retourSegs.map(s => s.numero).filter(n => !!n))].join(' / ')
+            } : null,
+            site: "SNCF Connect",
+            type: "TRAIN"
+        };
     }
   }
 
