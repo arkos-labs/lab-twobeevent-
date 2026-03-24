@@ -60,6 +60,7 @@ export interface Participant {
   billetsEnvoyes?: boolean;
   dateDebut?: string;
   dateFin?: string;
+  structure?: string;
 }
 
 export interface Congres {

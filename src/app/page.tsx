@@ -87,6 +87,7 @@ const normalizeParticipant = (p: any): Participant => {
     email: p.email || '',
     telephone: p.telephone || '',
     villeDepart: p.ville_depart || p.villeDepart || '',
+    structure: p.structure || '',
     statut: (p.statut as Participant['statut']) || 'A_TRAITER',
     dejaExporte: p.deja_exporte ?? p.dejaExporte ?? false,
     optionsChoisies: p.options_choisies ?? p.optionsChoisies ?? '',
@@ -409,17 +410,18 @@ export default function Dashboard() {
         const email = String(row[colMap.email] || '').trim();
         const telephone = String(row[colMap.telephone] || '').trim();
         const codePostal = String(row[colMap.cp] || '').trim();
-        const ville = String(row[colMap.ville] || '').trim();
-        const etablissement = String(row[colMap.etablissement] || '').trim();
+        
+        // FORÇAGE DES COLONNES SELON DEMANDE UTILISATEUR : U=VILLE, Q=STRUCTURE
+        const ville = String(row['U'] || row[colMap.ville] || '').trim();
+        const etablissement = String(row['Q'] || row[colMap.etablissement] || '').trim();
 
         return {
           id: generateId(),
           nom: `${prenom} ${nom}`.trim() || (email ? email.split('@')[0] : 'Inconnu'),
           email,
           telephone,
-          villeDepart: ville
-            ? `${ville}${codePostal ? ` (${codePostal})` : ''}`
-            : etablissement || 'Inconnue',
+          villeDepart: ville || 'À compléter',
+          structure: etablissement || '',
           statut: 'A_TRAITER',
         };
       });
@@ -447,6 +449,7 @@ export default function Dashboard() {
               ...mergedParticipants[idx],
               telephone: imp.telephone || mergedParticipants[idx].telephone,
               villeDepart: imp.villeDepart || mergedParticipants[idx].villeDepart,
+              structure: imp.structure || mergedParticipants[idx].structure,
               statut: mergedParticipants[idx].statut === 'A_TRAITER' ? imp.statut : mergedParticipants[idx].statut
             };
           } else {
@@ -1399,6 +1402,7 @@ export default function Dashboard() {
             date_fin: p.dateFin || '',
             statut: p.statut,
             deja_exporte: p.dejaExporte || false,
+            structure: p.structure || '',
             proposition_transport: p.logistique?.transports || [],
             proposition_hotel: p.logistique?.hotels || [],
             billets_envoyes: p.billetsEnvoyes || false
@@ -2068,8 +2072,16 @@ export default function Dashboard() {
                             </td>
 
                             {/* Ville */}
-                            <td className="px-6 py-6 transition-all">
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate block max-w-[100px]">{p.villeDepart}</span>
+                            <td className="px-6 py-6 transition-all min-w-[200px]">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-black text-gray-900 dark:text-gray-100 truncate block max-w-[180px] uppercase">{p.villeDepart}</span>
+                                {p.structure && (
+                                  <div className="flex items-center gap-1 mt-1 opacity-60">
+                                    <Hotel className="w-2.5 h-2.5 text-blue-500" />
+                                    <span className="text-[9px] font-bold text-gray-500 truncate max-w-[150px] uppercase italic">{p.structure}</span>
+                                  </div>
+                                )}
+                              </div>
                             </td>
 
                             {/* Aller (En ligne) */}
