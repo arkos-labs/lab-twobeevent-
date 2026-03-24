@@ -46,6 +46,12 @@ const validateEmail = (email: string) => {
 };
 const propositionVide = (): PropositionTransport => ({ aller: trajetVide(), retour: trajetVide() });
 
+const cleanCityForSearch = (city: string) => {
+  if (!city) return '';
+  // Supprime tout ce qui est entre parenthèses, ex: "Paris (75001)" -> "Paris"
+  return city.split(' (')[0].trim();
+};
+
 const normalizeParticipant = (p: any): Participant => {
   const cleanTransport = (t: any) => {
     const cleanStr = (s: any) => {
@@ -473,10 +479,11 @@ export default function Dashboard() {
       setHotels(p.logistique.hotels);
     } else {
       const initProp = propositionVide();
-      // Pré-remplissage intelligent basé sur la ville de départ du participant
+      // Pré-remplissage intelligent basé sur la ville de départ du participant (NETTOYÉ)
       if (p.villeDepart) {
-        initProp.aller.lieuDepart = p.villeDepart;
-        initProp.retour.lieuArrivee = p.villeDepart;
+        const city = cleanCityForSearch(p.villeDepart);
+        initProp.aller.lieuDepart = city;
+        initProp.retour.lieuArrivee = city;
       }
       setTransports([initProp]);
       setHotels([{ nom: '' }]);
@@ -2616,8 +2623,9 @@ export default function Dashboard() {
                         onClick={() => {
                           const newProp = propositionVide();
                           if (currentParticipant?.villeDepart) {
-                            newProp.aller.lieuDepart = currentParticipant.villeDepart;
-                            newProp.retour.lieuArrivee = currentParticipant.villeDepart;
+                            const city = cleanCityForSearch(currentParticipant.villeDepart);
+                            newProp.aller.lieuDepart = city;
+                            newProp.retour.lieuArrivee = city;
                           }
                           setTransports(t => [...t, newProp]);
                         }}
