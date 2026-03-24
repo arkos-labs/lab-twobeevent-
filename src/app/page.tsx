@@ -193,9 +193,11 @@ export default function Dashboard() {
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [dbError, setDbError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const isRealtimeUpdate = useRef(false);
 
   React.useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('logitools_theme');
       if (saved === 'dark') {
@@ -403,14 +405,36 @@ export default function Dashboard() {
         r.readAsDataURL(file);
       });
 
-      // Mise à jour groupée pour éviter les race conditions
-      setCongres(prev => prev.map(c => 
-        c.id === selectedId 
-          ? { ...c, participants: [...c.participants, ...imported], logisticsTemplate: base64 } 
-          : c
-      ));
+      // Mise à jour intelligente (Upsert) pour ne pas perdre les données déjà capturées
+      setCongres(prev => prev.map(c => {
+        if (c.id !== selectedId) return c;
 
-      console.log(`✅ ${imported.length} participants importés et template sauvegardé.`);
+        const mergedParticipants = [...c.participants];
+        imported.forEach(imp => {
+          const idx = mergedParticipants.findIndex(p => 
+            (imp.email && p.email.toLowerCase() === imp.email.toLowerCase()) ||
+            (p.nom.toLowerCase() === imp.nom.toLowerCase())
+          );
+
+          if (idx !== -1) {
+            // Mise à jour de l'existant sans écraser l'ID ni la logistique déjà capturée
+            mergedParticipants[idx] = {
+              ...mergedParticipants[idx],
+              telephone: imp.telephone || mergedParticipants[idx].telephone,
+              villeDepart: imp.villeDepart || mergedParticipants[idx].villeDepart,
+              // On ne touche pas au statut s'il a déjà été traité
+              statut: mergedParticipants[idx].statut === 'A_TRAITER' ? imp.statut : mergedParticipants[idx].statut
+            };
+          } else {
+            // Nouveau participant
+            mergedParticipants.push(imp);
+          }
+        });
+
+        return { ...c, participants: mergedParticipants, logisticsTemplate: base64 };
+      }));
+
+      console.log(`✅ Import terminé : ${imported.length} lignes traitées.`);
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -921,55 +945,89 @@ export default function Dashboard() {
         const base64Data = c.logisticsTemplate.includes(',') ? c.logisticsTemplate.split(',')[1] : c.logisticsTemplate;
         const wb = XLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
-
-        // On cherche les colonnes cibles si possible, sinon on utilise des index fixes basés sur l'expérience JNI
-        // Expérience JNI : 
-        // V: Gare Dep Aller, W: Heure Dep, X: Gare Arr, Y: Heure Arr, Z: N° Train
-        // AB: Gare Dep Ret, AC: Heure Dep, AD: Gare Arr, AE: Heure Arr, AF: N° Train
+        const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
         
-        data.forEach((row, idx) => {
-          const rowNum = idx + 1; // Index 1-based pour XLSX
+        // On garde trace des participants déjà insérés dans les lignes existantes
+        const matchedIds = new Set<string>();
+
+        rows.forEach((row, idx) => {
           const prenom = String(row['K'] || '').trim();
           const nom = String(row['L'] || '').trim();
           const email = String(row['P'] || '').trim();
-          
-          // Match du participant
+
+          if (!prenom && !nom && !email) return;
+
           const p = c.participants.find(part => 
-            (part.email && part.email === email) || 
+            (email && part.email.toLowerCase() === email.toLowerCase()) ||
             (part.nom.toLowerCase().includes(nom.toLowerCase()) && part.nom.toLowerCase().includes(prenom.toLowerCase()))
           );
 
-          if (p && p.logistique) {
-            const aller = p.logistique.transports[0]?.aller;
-            const retour = p.logistique.transports[0]?.retour;
-            const hotel = p.logistique.hotels[0];
+            if (p) {
+              matchedIds.add(p.id);
+              if (p.logistique) {
+                const aller = p.logistique.transports[0]?.aller;
+                const retour = p.logistique.transports[0]?.retour;
+                const hotel = p.logistique.hotels[0];
 
-            if (aller) {
-              // Aller selon vocal #3 : AC(28) Type, AD(29) Corresp, AF(31) Gare Dep, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
-              if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
-              if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.correspondanceLieu }; 
-              if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuDepart }; 
-              if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      
-              if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     
-              if (aller.numero) ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: aller.numero };       
+                if (aller) {
+                  // ALLER : AC(28) Type, AE(30) Corresp, AF(31) Gare Dep, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
+                  if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
+                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE(30)
+                  if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuDepart }; // AF
+                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      // AG
+                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     // AH
+                  if (aller.numero) ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: aller.numero };       // AI
+                }
+                if (retour) {
+                  // RETOUR : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) Corresp, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
+                  if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
+                  if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
+                  if (retour.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
+                  if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu };
+                  if (retour.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
+                  if (retour.depart) ws[XLSX.utils.encode_cell({r: idx, c: 40})] = { v: retour.depart };
+                  if (retour.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 41})] = { v: retour.arrivee };
+                  if (retour.numero) ws[XLSX.utils.encode_cell({r: idx, c: 42})] = { v: retour.numero };
+                }
+                if (hotel && hotel.nom) {
+                  ws[XLSX.utils.encode_cell({r: idx, c: 43})] = { v: hotel.nom }; // AR(43)
+                }
+              }
             }
-            if (retour) {
-              // Retour selon vocal #3 : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) Corresp, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
-              if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 34 + 1})] = { v: retour.date }; // AJ(35)
-              if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
-              if (retour.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
-              if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu };
-              if (retour.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
-              if (retour.depart) ws[XLSX.utils.encode_cell({r: idx, c: 40})] = { v: retour.depart };
-              if (retour.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 41})] = { v: retour.arrivee };
-              if (retour.numero) ws[XLSX.utils.encode_cell({r: idx, c: 42})] = { v: retour.numero };
-            }
-            if (hotel && hotel.nom) {
-              ws[XLSX.utils.encode_cell({r: idx, c: 43})] = { v: hotel.nom }; // AR(43)
-            }
-          }
         });
+
+        // 3. Ajouter les participants qui n'étaient pas dans le fichier d'origine à la fin
+        const unmatched = c.participants.filter(p => !matchedIds.has(p.id) && p.statut !== 'SUPPRIME');
+        if (unmatched.length > 0) {
+          let nextRow = rows.length;
+          unmatched.forEach(p => {
+            // Identifier le médecin
+            const names = p.nom.split(' ');
+            ws[XLSX.utils.encode_cell({r: nextRow, c: 10})] = { v: names[0] || '' }; // K
+            ws[XLSX.utils.encode_cell({r: nextRow, c: 11})] = { v: names.slice(1).join(' ') || '' }; // L
+            ws[XLSX.utils.encode_cell({r: nextRow, c: 15})] = { v: p.email }; // P
+            ws[XLSX.utils.encode_cell({r: nextRow, c: 14})] = { v: p.telephone }; // O
+
+            if (p.logistique) {
+              const aller = p.logistique.transports[0]?.aller;
+              const retour = p.logistique.transports[0]?.retour;
+              const hotel = p.logistique.hotels[0];
+
+              if (aller) {
+                if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
+                if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuDepart }; 
+                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.depart };      
+                if (aller.numero) ws[XLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: aller.numero };       
+              }
+              if (retour) {
+                if (retour.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
+                if (retour.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 40})] = { v: retour.depart };
+              }
+              if (hotel && hotel.nom) ws[XLSX.utils.encode_cell({r: nextRow, c: 43})] = { v: hotel.nom };
+            }
+            nextRow++;
+          });
+        }
 
         const outB64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
         downloadBase64File(`data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${outB64}`, `Base_Sync_${c.nom}.xlsx`);
@@ -1161,38 +1219,17 @@ export default function Dashboard() {
   // ─── Synchronisation Supabase Uniquement ───
   React.useEffect(() => {
     if (loading) return;
-    if (!initializedRef.current) return;
+    if (!initializedRef.current || congres.length === 0) return;
     
-    // Si c'est une mise à jour venant du Realtime, on ne la repousse pas
     if (isRealtimeUpdate.current) {
       isRealtimeUpdate.current = false;
       return;
     }
 
-    // 2. Synchronisation en ligne (Supabase - Tables V2)
     const syncToDB = async () => {
       setSyncStatus('SYNCING');
       try {
-        // Upsert des paramètres
-        const { error: errSettings } = await supabase.from('settings').upsert({
-          id: 1,
-          email_template: emailTemplate
-        }, { onConflict: 'id' });
-        if (errSettings) throw errSettings;
-
-        // Upsert de l'historique
-        const historyPayload = exportHistory.map((h, i) => ({
-          id: h.id || `${h.date}-${i}`,
-          date: h.date,
-          description: h.congresName,
-          nb_participants: h.count
-        }));
-        if (historyPayload.length > 0) {
-          const { error: errHist } = await supabase.from('export_history').upsert(historyPayload, { onConflict: 'id' });
-          if (errHist) throw errHist;
-        }
-
-        // Upsert des congrès
+        // 1. Upsert des données principales
         const congresPayload = congres.map(c => ({
           id: c.id,
           nom: c.nom,
@@ -1206,12 +1243,7 @@ export default function Dashboard() {
           bulletin_template: c.bulletinTemplate || null,
           logistics_template: c.logisticsTemplate || null
         }));
-        if (congresPayload.length > 0) {
-          const { error: errCongres } = await supabase.from('congres').upsert(congresPayload, { onConflict: 'id' });
-          if (errCongres) throw errCongres;
-        }
 
-        // Upsert des participants
         const allParticipants = congres.flatMap(c =>
           c.participants.map(p => ({
             id: p.id,
@@ -1222,57 +1254,47 @@ export default function Dashboard() {
             ville_depart: p.villeDepart,
             statut: p.statut,
             deja_exporte: p.dejaExporte || false,
-            date_debut: c.dateDebut || c.date,
-            date_fin: c.dateFin,
             proposition_transport: p.logistique?.transports || [],
             proposition_hotel: p.logistique?.hotels || [],
-            options_choisies: p.optionsChoisies || '',
             billets_envoyes: p.billetsEnvoyes || false
           }))
         );
 
-        if (allParticipants.length > 0) {
-          const { error: errPart } = await supabase.from('participants').upsert(allParticipants, { onConflict: 'id' });
-          if (errPart) throw errPart;
+        const historyPayload = exportHistory.map((h, i) => ({
+          id: h.id || `${h.date}-${i}`,
+          date: h.date,
+          description: h.congresName,
+          nb_participants: h.count
+        }));
+
+        // Exécution des Upserts
+        await supabase.from('congres').upsert(congresPayload);
+        await supabase.from('participants').upsert(allParticipants);
+        await supabase.from('export_history').upsert(historyPayload);
+
+        // 2. NETTOYAGE (DELETE) - ORDRE CRITIQUE : PARTICIPANTS D'ABORD
+        // A. Participants
+        const { data: dbParticipants } = await supabase.from('participants').select('id');
+        const currentPIds = allParticipants.map(p => p.id);
+        const pToDelete = (dbParticipants || []).map((r: any) => r.id).filter((id: string) => !currentPIds.includes(id));
+        if (pToDelete.length > 0) {
+          await supabase.from('participants').delete().in('id', pToDelete);
         }
 
-        // ── SUPPRESSION des entrées Supabase qui n'existent plus localement ──
-        // Stratégie : récupérer les IDs en base, calculer la différence, supprimer via .in()
-
-        // 1. Congrès supprimés
-        const currentCongresIds = congresPayload.map(c => c.id);
-        const { data: existingCongres } = await supabase.from('congres').select('id');
-        const congresIdsToDelete = (existingCongres || [])
-          .map((r: any) => r.id)
-          .filter((id: string) => !currentCongresIds.includes(id));
-        if (congresIdsToDelete.length > 0) {
-          const { error: errDelCongres } = await supabase
-            .from('congres').delete().in('id', congresIdsToDelete);
-          if (errDelCongres) console.error("Erreur DELETE congrès:", errDelCongres);
+        // B. Congrès
+        const { data: dbCongres } = await supabase.from('congres').select('id');
+        const currentCIds = congresPayload.map(c => c.id);
+        const cToDelete = (dbCongres || []).map((r: any) => r.id).filter((id: string) => !currentCIds.includes(id));
+        if (cToDelete.length > 0) {
+          await supabase.from('congres').delete().in('id', cToDelete);
         }
 
-        // 2. Participants supprimés définitivement (hors SUPPRIME qui reste en base)
-        const currentParticipantIds = allParticipants.map(p => p.id);
-        const { data: existingParticipants } = await supabase.from('participants').select('id');
-        const participantsIdsToDelete = (existingParticipants || [])
-          .map((r: any) => r.id)
-          .filter((id: string) => !currentParticipantIds.includes(id));
-        if (participantsIdsToDelete.length > 0) {
-          const { error: errDelPart } = await supabase
-            .from('participants').delete().in('id', participantsIdsToDelete);
-          if (errDelPart) console.error("Erreur DELETE participants:", errDelPart);
-        }
-
-        // 3. Historique supprimé
-        const currentHistoryIds = historyPayload.map(h => h.id);
-        const { data: existingHistory } = await supabase.from('export_history').select('id');
-        const historyIdsToDelete = (existingHistory || [])
-          .map((r: any) => r.id)
-          .filter((id: string) => !currentHistoryIds.includes(id));
-        if (historyIdsToDelete.length > 0) {
-          const { error: errDelHist } = await supabase
-            .from('export_history').delete().in('id', historyIdsToDelete);
-          if (errDelHist) console.error("Erreur DELETE historique:", errDelHist);
+        // C. Historique
+        const { data: dbHistory } = await supabase.from('export_history').select('id');
+        const currentHIds = historyPayload.map(h => h.id);
+        const hToDelete = (dbHistory || []).map((r: any) => r.id).filter((id: string) => !currentHIds.includes(id));
+        if (hToDelete.length > 0) {
+          await supabase.from('export_history').delete().in('id', hToDelete);
         }
 
         setSyncStatus('SUCCESS');
@@ -1280,7 +1302,7 @@ export default function Dashboard() {
         setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 3000);
 
       } catch (err: any) {
-        console.error("Sync Error:", err);
+        console.warn("Sync Issue (UI Not Blocked):", err);
         setSyncStatus('ERROR');
         setDbError(err.message || String(err));
       }
@@ -1310,8 +1332,27 @@ export default function Dashboard() {
   };
 
 
+  if (!mounted) return null;
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white dark:bg-slate-950 z-[200] flex flex-col items-center justify-center gap-6" suppressHydrationWarning>
+        <div className="relative">
+          <div className="w-24 h-24 border-4 border-blue-100 dark:border-blue-900/30 rounded-full animate-spin border-t-blue-600" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Database className="w-8 h-8 text-blue-600 animate-pulse" />
+          </div>
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-black italic tracking-tighter text-slate-800 dark:text-white uppercase">Initialisation LogiCongrès</h2>
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 tracking-widest uppercase animate-pulse">Récupération des données sécurisées...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex bg-[#F8F9FB] text-[#1D1D1D] font-sans selection:bg-blue-100">
+    <div className="min-h-screen flex bg-[#F8F9FB] text-[#1D1D1D] font-sans selection:bg-blue-100" suppressHydrationWarning>
 
 
       {/* ══════════════ SIDEBAR GAUCHE (STYLE FLOWDESK) ══════════════ */}
@@ -1392,8 +1433,8 @@ export default function Dashboard() {
                   <div className={`w-2 h-2 rounded-full shadow-sm ${isSelected ? 'bg-blue-600 animate-pulse' : 'bg-gray-300'}`} />
                   <span className="truncate text-sm flex-1 flex items-center gap-2">
                     {c.nom}
-                    {(c.bulletinTemplate || c.logisticsTemplate) && (
-                      <FileText className="w-3 h-3 text-emerald-500" />
+                    {c.logisticsTemplate && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Modèle Excel JNI OK" />
                     )}
                   </span>
                   <div className="flex gap-2 transition-opacity">
@@ -1507,13 +1548,17 @@ export default function Dashboard() {
               </div>
             )}
             {syncStatus === 'ERROR' && (
-              <button 
-                onClick={() => setHistoryOpen(true)} // Or some status modal
-                title={dbError || "Erreur de connexion"}
-                className="flex items-center gap-2 text-[10px] font-black italic text-red-500 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 uppercase tracking-tighter"
-              >
-                <AlertCircle className="w-3 h-3" /> Base de données : Erreur
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => alert(`Détails de l'erreur : ${dbError}`)}
+                  className="flex items-center gap-2 text-[10px] font-black italic text-red-500 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 uppercase tracking-tighter hover:bg-red-100 transition-all"
+                >
+                  <AlertCircle className="w-3 h-4" /> Erreur de synchro (F12)
+                </button>
+                <button onClick={() => window.location.reload()} className="p-2 bg-gray-50 text-gray-400 hover:text-blue-600 rounded-xl border border-gray-100 transition-all">
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
             )}
             {syncStatus === 'SUCCESS' && (
               <div className="flex items-center gap-2 text-[10px] font-black italic text-emerald-500 bg-emerald-px-3 py-1.5 rounded-lg">
@@ -2219,7 +2264,16 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4 mt-2">
                     <span className="text-[12px] font-black uppercase text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-4 py-1.5 rounded-xl tracking-widest border-2 border-blue-100 dark:border-blue-800/50 shadow-sm">CONCIERGE LOGISTIQUE</span>
                     <div className="h-4 w-[2px] bg-slate-200 dark:bg-slate-700" />
-                    <span className="text-sm font-bold text-slate-400 italic">Événement : {selectedCongres?.nom}</span>
+                    <span 
+                      className="text-xs font-mono text-slate-400 cursor-pointer hover:text-blue-600 transition-colors"
+                      title="Cliquez pour copier l'ID"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentParticipant.id);
+                        alert("ID Copié : " + currentParticipant.id);
+                      }}
+                    >
+                      ID: {currentParticipant.id} 📋
+                    </span>
                   </div>
                 </div>
               </div>
