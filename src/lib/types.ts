@@ -52,10 +52,13 @@ export interface LogistiqueSaisie {
 export interface Participant {
   id: string;
   nom: string;
+  prenom?: string;
+  dateNaissance?: string;
+  sncf?: string;
   email: string;        // peut être vide ''
   telephone: string;    // colonne O
   villeDepart: string;
-  statut: 'A_TRAITER' | 'ATTENTE_REPONSE' | 'VALIDE' | 'SUPPRIME';
+  statut: 'A_TRAITER' | 'ATTENTE_REPONSE' | 'VALIDE' | 'SUPPRIME' | 'ANNULE';
   logistique?: LogistiqueSaisie;
   dejaExporte?: boolean;
   optionsChoisies?: string;

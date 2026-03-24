@@ -6,16 +6,17 @@ import {
   MailCheck, Mail, MapPin, Edit3, X, Plus, Trash2, Calendar,
   AlertCircle, AlertTriangle, RotateCcw, Clock, ChevronRight, Train, Plane, Hotel,
   Search, Bell, LayoutDashboard, Settings, Filter, MoreHorizontal, Archive, ArchiveRestore, Copy, Database, Ticket,
-  Moon, Sun, Wand2, Zap, ArrowRight, Eye, FileCheck, FilePlus2, FileText
+  Moon, Sun, Wand2, Zap, ArrowRight, Eye, FileCheck, FilePlus2, FileText, Send
 } from 'lucide-react';
 import { ParticipantDetailsModal } from './ParticipantDetailsModal';
 import { generateInvitationPDF } from '@/lib/pdfGenerator';
 import { openGoogleFlights, openGoogleHotels, openSNCF, openTrainline } from '@/lib/searchUtils';
 import { fetchAddressSuggestions } from '@/lib/autocomplete';
-import * as XLSX from 'xlsx';
+import * as StyledXLSX from 'xlsx-js-style';
 import { createReport } from 'docx-templates';
 import { supabase } from '@/lib/supabase';
 import { JNI_EXCEL, JNI_DOCX, JNI_BULLETIN_PDF } from './jni_templates';
+import { applyRowStyle, ensureSheetRange } from '@/lib/excelStyles';
 import type { Congres, ExportHistory, ExportHistoryRow, Participant, PropositionHotel, PropositionTransport, Segment, Trajet } from '@/lib/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -85,6 +86,9 @@ const normalizeParticipant = (p: any): Participant => {
   return {
     id: p.id,
     nom: p.nom || 'Inconnu',
+    prenom: p.prenom || '',
+    dateNaissance: p.date_naissance || p.dateNaissance || '',
+    sncf: p.sncf || '',
     email: p.email || '',
     telephone: p.telephone || '',
     villeDepart: p.ville_depart || p.villeDepart || '',
@@ -143,6 +147,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<'BOARD' | 'ARCHIVES'>('BOARD');
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initializedRef = useRef(false);
 
   // ── Modale ajout congrès ──
   const [addCongressOpen, setAddCongressOpen] = useState(false);
@@ -161,6 +166,7 @@ export default function Dashboard() {
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
   const [transports, setTransports] = useState<PropositionTransport[]>([]);
   const [hotels, setHotels] = useState<PropositionHotel[]>([]);
+  const [copyDropdownOpen, setCopyDropdownOpen] = useState(false);
 
   // ── Modale Edition Contact ──
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -168,6 +174,9 @@ export default function Dashboard() {
   const [tempEmail, setTempEmail] = useState('');
   const [tempPhone, setTempPhone] = useState('');
   const [tempNom, setTempNom] = useState('');
+  const [tempPrenom, setTempPrenom] = useState('');
+  const [tempBirth, setTempBirth] = useState('');
+  const [tempSNCF, setTempSNCF] = useState('');
 
   // ── Actions Groupées ──
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
@@ -240,6 +249,7 @@ export default function Dashboard() {
   }, [modalOpen, currentParticipant]);
 
   const selectedCongres = congres.find(c => c.id === selectedId) ?? null;
+  const participants = selectedCongres?.participants || [];
 
   const updateParticipants = (congresId: string, updater: (ps: Participant[]) => Participant[]) => {
     setCongres(prev => prev.map(c =>
@@ -371,12 +381,12 @@ export default function Dashboard() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const arrayBuffer = evt.target?.result as ArrayBuffer;
-      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+      const wb = StyledXLSX.read(arrayBuffer, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
+      const data: any[] = StyledXLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
 
       const headerRow = data[0] || {};
-      const colMap = { prenom: 'K', nom: 'L', email: 'P', telephone: 'O', cp: 'T', ville: 'U', etablissement: 'Q' };
+      const colMap = { prenom: 'K', nom: 'L', email: 'P', telephone: 'O', cp: 'T', ville: 'U', etablissement: 'Q', naissance: '', sncf: '' };
 
       // Détection intelligente des colonnes
       Object.entries(headerRow).forEach(([col, val]) => {
@@ -388,6 +398,8 @@ export default function Dashboard() {
         if (sVal.includes('ville') || sVal.includes('city') || sVal.includes('départ')) colMap.ville = col;
         if (sVal.includes('postal') || sVal.includes('code p')) colMap.cp = col;
         if (sVal.includes('établissement') || sVal.includes('société') || sVal.includes('structure')) colMap.etablissement = col;
+        if (sVal.includes('naissance') || sVal.includes('birth')) colMap.naissance = col;
+        if (sVal.includes('sncf') || sVal.includes('fidélité') || sVal.includes('carte')) colMap.sncf = col;
       });
 
       // Filtrer les lignes qui ont au moins un nom ou un email
@@ -410,7 +422,8 @@ export default function Dashboard() {
         const nom = String(row[colMap.nom] || '').trim();
         const email = String(row[colMap.email] || '').trim();
         const telephone = String(row[colMap.telephone] || '').trim();
-        const codePostal = String(row[colMap.cp] || '').trim();
+        const naissance = String(row[colMap.naissance] || '').trim();
+        const sncf = String(row[colMap.sncf] || '').trim();
         
         // Utilisation des colonnes détectées (ou fallback sur U et Q si non trouvées)
         const villeRaw = String(row[colMap.ville] || row['U'] || '').trim();
@@ -517,7 +530,7 @@ export default function Dashboard() {
 
   const saveLogistique = (andEmail: boolean = false) => {
     if (!currentParticipant || !selectedId) return;
-    const updatedPart: Participant = { ...currentParticipant, logistique: { transports, hotels } };
+    const updatedPart: Participant = { ...currentParticipant, logistique: { transports, hotels }, dejaExporte: false };
 
     updateParticipants(selectedId, ps =>
       ps.map(p => p.id === currentParticipant.id ? updatedPart : p)
@@ -680,16 +693,16 @@ export default function Dashboard() {
         const base64Data = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
         
         // IMPORTANT: Lire avec cellFormula: true pour ne pas perdre les formules existantes
-        const wb = XLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
+        const wb = StyledXLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
 
         // 1. Détection des en-têtes et remplissage par correspondance (pour formulaires)
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z200');
+        const range = StyledXLSX.utils.decode_range(ws['!ref'] || 'A1:Z200');
         const headerMap: Record<string, {r: number, c: number}> = {};
         
         for (let r = range.s.r; r <= Math.min(range.e.r, 150); r++) {
           for (let c = range.s.c; c <= range.e.c; c++) {
-            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            const cell = ws[StyledXLSX.utils.encode_cell({ r, c })];
             if (cell && cell.v) {
               const val = String(cell.v).trim().toLowerCase();
               Object.keys(data).forEach(k => {
@@ -704,7 +717,7 @@ export default function Dashboard() {
 
         // Remplissage à droite du label trouvé
         Object.entries(headerMap).forEach(([key, pos]) => {
-          const targetAddr = XLSX.utils.encode_cell({ r: pos.r, c: pos.c + 1 });
+          const targetAddr = StyledXLSX.utils.encode_cell({ r: pos.r, c: pos.c + 1 });
           ws[targetAddr] = { v: data[key], t: 's' };
         });
 
@@ -728,7 +741,8 @@ export default function Dashboard() {
           }
         });
 
-        const outB64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+        const outB64 = StyledXLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
         downloadBase64File(`data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${outB64}`, `${filename}.xlsx`);
       } catch (err) {
         console.error("❌ EXCEL Fill Error:", err);
@@ -840,14 +854,25 @@ export default function Dashboard() {
     setEditingParticipant(p);
     setTempEmail(p.email);
     setTempPhone(p.telephone);
-    setTempNom(p.nom);
+    setTempNom(p.nom || '');
+    setTempPrenom(p.prenom || '');
+    setTempBirth(p.dateNaissance || '');
+    setTempSNCF(p.sncf || '');
     setContactModalOpen(true);
   };
 
   const saveContactInfo = () => {
     if (!editingParticipant || !selectedId) return;
     updateParticipants(selectedId, ps =>
-      ps.map(p => p.id === editingParticipant.id ? { ...p, email: tempEmail, telephone: tempPhone, nom: tempNom } : p)
+      ps.map(p => p.id === editingParticipant.id ? { 
+        ...p, 
+        email: tempEmail, 
+        telephone: tempPhone, 
+        nom: tempNom,
+        prenom: tempPrenom,
+        dateNaissance: tempBirth,
+        sncf: tempSNCF
+      } : p)
     );
     setContactModalOpen(false);
     setEditingParticipant(null);
@@ -861,122 +886,92 @@ export default function Dashboard() {
   };
 
   // ─── Export Agence (Nouveaux uniquement) ───────────────────────────────────
-  const handleExportAgence = () => {
-    if (!selectedCongres) return;
+  const generateAgencyMessage = (aExporter: Participant[]) => {
+    let message = "";
+    aExporter.forEach(p => {
+      const trans = p.logistique?.transports[0];
+      const aller = trans?.aller;
+      const retour = trans?.retour;
 
+      message += `Nom : ${p.nom.toUpperCase()}\n`;
+      message += `Prénom : ${p.prenom || ''}\n`;
+      message += `Date de naissance : ${p.dateNaissance || ''}\n`;
+      message += `SNCF : ${p.sncf || ''}\n\n`;
+
+      message += `Date aller : ${aller?.date || ''}\n`;
+      message += `Gare de départ : ${aller?.lieuDepart || ''}\n`;
+      message += `Gare d'arrivée :  ${aller?.lieuArrivee || ''}\n`;
+      message += `Heure de départ : ${aller?.depart || ''}\n`;
+      message += `Heure d'arrivée : ${aller?.arrivee || ''}\n`;
+      message += `Référence : ${aller?.numero || ''}\n`;
+      if (aller?.correspondanceLieu) {
+        message += `Correspondance : ${aller.correspondanceLieu} (${aller.correspondanceHeure || ''}) - N°${aller.correspondanceNumero || '?'}\n`;
+      }
+      message += "\n";
+
+      message += `Date retour : ${retour?.date || ''}\n`;
+      message += `Gare de départ : ${retour?.lieuDepart || ''}\n`;
+      message += `Gare d'arrivée : ${retour?.lieuArrivee || ''}\n`;
+      message += `Heure de départ : ${retour?.depart || ''}\n`;
+      message += `Heure d'arrivée : ${retour?.arrivee || ''}\n`;
+      message += `Référence : ${retour?.numero || ''}\n`;
+      if (retour?.correspondanceLieu) {
+        message += `Correspondance : ${retour.correspondanceLieu} (${retour.correspondanceHeure || ''}) - N°${retour.correspondanceNumero || '?'}\n`;
+      }
+      
+      const hotel = p.logistique?.hotels[0];
+      if (hotel && hotel.nom) {
+        message += `\nHôtel : ${hotel.nom}\n`;
+        if (hotel.checkIn) message += `Dates : Du ${hotel.checkIn} au ${hotel.checkOut || '?'}\n`;
+      }
+
+      message += `\n---------------------------------------\n\n`;
+    });
+    return message;
+  };
+
+  const handleExportAgence = async () => {
+    if (!selectedCongres) return;
+ 
     // 1. Filtrer les médecins validés qui n'ont PAS encore été exportés
     const aExporter = selectedCongres.participants.filter(p => p.statut === 'VALIDE' && !p.dejaExporte);
-
+ 
     if (aExporter.length === 0) {
       alert("Aucun nouveau médecin validé à exporter pour le moment.");
       return;
     }
-
-    // 2. Préparer les données pour l'Excel de l'agence
-    const dataExcel = aExporter.map(p => ({
-      'Médecin': p.nom,
-      'Email': p.email,
-      'Téléphone': p.telephone,
-      'Ville Départ': p.villeDepart,
-      'Congrès': selectedCongres.nom,
-      // ALLER
-      'Type Aller': p.logistique?.transports[0]?.aller.type === 'TRAIN' ? 'Train' : (p.logistique?.transports[0]?.aller.type === 'FLIGHT' ? 'Avion' : ''),
-      'De (Aller)': p.logistique?.transports[0]?.aller.lieuDepart,
-      'À (Aller)': p.logistique?.transports[0]?.aller.lieuArrivee,
-      'N° Vol/Train (Aller)': p.logistique?.transports[0]?.aller.numero,
-      'Date Aller': p.logistique?.transports[0]?.aller.date,
-      'Heure Aller': p.logistique?.transports[0]?.aller.depart,
-      'Correspondance Aller': p.logistique?.transports[0]?.aller.correspondanceLieu
-        ? `${p.logistique.transports[0].aller.correspondanceLieu} (${p.logistique.transports[0].aller.correspondanceType === 'FLIGHT' ? 'Avion' : (p.logistique.transports[0].aller.correspondanceType === 'TRAIN' ? 'Train' : (p.logistique.transports[0].aller.correspondanceType || ''))}) le ${p.logistique.transports[0].aller.correspondanceDate} à ${p.logistique.transports[0].aller.correspondanceHeure} - N° ${p.logistique.transports[0].aller.correspondanceNumero || '?'}`
-        : 'Direct',
-      // RETOUR
-      'Type Retour': p.logistique?.transports[0]?.retour.type === 'TRAIN' ? 'Train' : (p.logistique?.transports[0]?.retour.type === 'FLIGHT' ? 'Avion' : ''),
-      'De (Retour)': p.logistique?.transports[0]?.retour.lieuDepart,
-      'À (Retour)': p.logistique?.transports[0]?.retour.lieuArrivee,
-      'N° Vol/Train (Retour)': p.logistique?.transports[0]?.retour.numero,
-      'Date Retour': p.logistique?.transports[0]?.retour.date,
-      'Heure Retour': p.logistique?.transports[0]?.retour.depart,
-      'Correspondance Retour': p.logistique?.transports[0]?.retour.correspondanceLieu
-        ? `${p.logistique.transports[0].retour.correspondanceLieu} (le ${p.logistique.transports[0].retour.correspondanceDate} à ${p.logistique.transports[0].retour.correspondanceHeure}) - N° ${p.logistique.transports[0].retour.correspondanceNumero || '?'}`
-        : 'Direct',
-      // HOTEL
-      'Hôtel': p.logistique?.hotels[0]?.nom,
-      'Dates Hôtel': p.logistique?.hotels && p.logistique.hotels.length > 0 && p.logistique.hotels[0].checkIn ? `Du ${p.logistique.hotels[0].checkIn} au ${p.logistique.hotels[0].checkOut || '?'}` : ''
-    }));
-
-    // 3. Générer le fichier
-    const isJNI = isJNIEvent(selectedCongres.nom);
-    const templateB64 = selectedCongres.logisticsTemplate || (isJNI ? 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL : null);
-
-    if (templateB64 && templateB64.includes('spreadsheetml')) {
-      // UTILISATION DU MODÈLE (ex: JNI 2026)
-      try {
-        console.log("🛠️ Export via modèle agence...");
-        const base64Data = templateB64.includes(',') ? templateB64.split(',')[1] : templateB64;
-        const wb = XLSX.read(base64Data, { type: 'base64' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-
-        // Détection des en-têtes (on utilise le premier participant pour avoir les clés)
-        const sampleData = getParticipantTemplateData(aExporter[0], selectedCongres);
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z100');
-        const headerMap: Record<string, number> = {};
-        
-        // On scanne les 100 premières lignes pour trouver les colonnes
-        for (let r = 0; r <= 100; r++) {
-          for (let c = range.s.c; c <= range.e.c; c++) {
-            const cell = ws[XLSX.utils.encode_cell({ r, c })];
-            if (cell && cell.v) {
-              const val = String(cell.v).trim().toLowerCase();
-              Object.keys(sampleData).forEach(k => {
-                if (k.toLowerCase() === val || val.includes(k.toLowerCase())) {
-                  headerMap[k] = c;
-                }
-              });
-            }
-          }
-        }
-
-        if (Object.keys(headerMap).length > 0) {
-          // On ajoute chaque participant sur une nouvelle ligne
-          let startRow = 1;
-          const firstCol = headerMap['NOM'] || 0;
-          while (ws[XLSX.utils.encode_cell({ r: startRow, c: firstCol })]?.v) {
-            startRow++;
-          }
-
-          aExporter.forEach((p, index) => {
-            const rowData = getParticipantTemplateData(p, selectedCongres);
-            const currentRow = startRow + index;
-            Object.entries(headerMap).forEach(([key, col]) => {
-              const addr = XLSX.utils.encode_cell({ r: currentRow, c: col });
-              ws[addr] = { v: rowData[key as keyof typeof rowData], t: 's' };
-            });
-          });
-          
-          console.log(`✅ ${aExporter.length} participants ajoutés au modèle.`);
-        }
-
-        XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
-      } catch (err) {
-        console.error("❌ Erreur remplissage modèle agence, fallback standard:", err);
-        const ws = XLSX.utils.json_to_sheet(dataExcel);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "A Réserver");
-        XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
-      }
-    } else {
-      // GÉNÉRATION STANDARD
-      const ws = XLSX.utils.json_to_sheet(dataExcel);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "A Réserver");
-      XLSX.writeFile(wb, `Export_Agence_${selectedCongres.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString()}.xlsx`);
+ 
+    // 2. Générer le message
+    const messageToCopy = generateAgencyMessage(aExporter);
+ 
+    // 3. Ouvrir Gmail compose ou Clipboard
+    try {
+      const agencyEmail = "keisha.khoto-thinu@twobevents.fr";
+      const subject = `LOGISTIQUE AGENCE - ${selectedCongres.nom.toUpperCase()} (${aExporter.length} PARTICIPANTS)`;
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(agencyEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageToCopy)}`;
+      
+      window.open(gmailUrl, '_blank');
+      
+      // On copie quand même au cas où Gmail bloque les popups
+      await navigator.clipboard.writeText(messageToCopy);
+      
+      alert(`✅ ${aExporter.length} participants préparés pour l'agence ! (Ouverture de Gmail + Copie presse-papier)`);
+      
+      // Marquer comme déjà exportés pour éviter les doublons au prochain clic
+      updateParticipants(selectedCongres.id, ps => 
+        ps.map(p => aExporter.some(ae => ae.id === p.id) ? { ...p, dejaExporte: true } : p)
+      );
+    } catch (err) {
+      console.error("Erreur ouverture Gmail:", err);
+      await navigator.clipboard.writeText(messageToCopy);
+      alert("Impossible d'ouvrir Gmail. Les données ont été copiées dans le presse-papier.");
     }
 
     // 4. Marquer comme exportés dans la base
     updateParticipants(selectedCongres.id, ps =>
       ps.map(p => aExporter.some(ae => ae.id === p.id) ? { ...p, dejaExporte: true } : p)
     );
-
+ 
     // 5. Enregistrer dans l'historique
     setExportHistory(prev => [
       {
@@ -1003,9 +998,9 @@ export default function Dashboard() {
       try {
         console.log("🧬 Export synchronisé avec le fichier source...");
         const base64Data = c.logisticsTemplate.includes(',') ? c.logisticsTemplate.split(',')[1] : c.logisticsTemplate;
-        const wb = XLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
+        const wb = StyledXLSX.read(base64Data, { type: 'base64', cellFormula: true, cellStyles: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
+        const rows: any[] = StyledXLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
         
         // On garde trace des participants déjà insérés dans les lignes existantes
         const matchedIds = new Set<string>();
@@ -1025,14 +1020,17 @@ export default function Dashboard() {
             if (p) {
               matchedIds.add(p.id);
               
-              if (p.statut === 'SUPPRIME') {
-                // On marque le nom de façon visible
-                ws[XLSX.utils.encode_cell({r: idx, c: 11})] = { v: (String(row['L'] || '') + " [ANNULÉ]").trim() };
-                
+              // On applique le style immédiatement à cette ligne existante
+              applyRowStyle(ws, idx, p);
+
+              if (p.statut === 'ANNULE' || p.statut === 'SUPPRIME') {
+                // On marque le nom de façon visible dans la colonne L (index 11)
+                ws[StyledXLSX.utils.encode_cell({r: idx, c: 11})] = { v: (String(row['L'] || '') + " [ANNULÉ]").trim() };
+
                 // On vide les colonnes logistiques pour éviter toute confusion
                 const colsToClear = [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43];
                 colsToClear.forEach(col => {
-                  const addr = XLSX.utils.encode_cell({ r: idx, c: col });
+                  const addr = StyledXLSX.utils.encode_cell({ r: idx, c: col });
                   if (ws[addr]) ws[addr] = { v: '', t: 's' };
                 });
                 return; // Ne pas remplir les détails
@@ -1063,14 +1061,14 @@ export default function Dashboard() {
                       const mode = (aller.correspondanceLieu && aller.correspondanceType && aller.correspondanceType !== aller.type)
                           ? `${aller.type === 'TRAIN' ? 'Train' : 'Avion'} + ${aller.correspondanceType === 'TRAIN' ? 'Train' : 'Avion'}`
                           : (aller.type === 'TRAIN' ? 'Train' : 'Avion');
-                      ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: mode }; 
+                      ws[StyledXLSX.utils.encode_cell({r: idx, c: 28})] = { v: mode }; 
                   }
-                  if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
-                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE (GARE CORRESP)
-                  if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuArrivee }; // AF
-                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      // AG
-                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     // AH
-                  ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: refAller };       // AI (RÉFÉRENCE)
+                  if (aller.lieuDepart) ws[StyledXLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
+                  if (aller.correspondanceLieu) ws[StyledXLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE (GARE CORRESP)
+                  if (aller.lieuArrivee) ws[StyledXLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuArrivee }; // AF
+                  if (aller.depart) ws[StyledXLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      // AG
+                  if (aller.arrivee) ws[StyledXLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     // AH
+                  ws[StyledXLSX.utils.encode_cell({r: idx, c: 34})] = { v: refAller };       // AI (RÉFÉRENCE)
                 }
                 if (retour) {
                   // RETOUR : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) Corresp, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
@@ -1084,38 +1082,38 @@ export default function Dashboard() {
                   }
                   const refRetour = refs.join(' + ');
 
-                  if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
+                  if (retour.date) ws[StyledXLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
                   if (retour.type) {
                       const mode = (retour.correspondanceLieu && retour.correspondanceType && retour.correspondanceType !== retour.type)
                           ? `${retour.type === 'TRAIN' ? 'Train' : 'Avion'} + ${retour.correspondanceType === 'TRAIN' ? 'Train' : 'Avion'}`
                           : (retour.type === 'TRAIN' ? 'Train' : 'Avion');
-                      ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: mode };
+                      ws[StyledXLSX.utils.encode_cell({r: idx, c: 36})] = { v: mode };
                   }
-                  if (retour.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
-                  if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu }; // AM (GARE CORRESP)
-                  if (retour.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
-                  if (retour.depart) ws[XLSX.utils.encode_cell({r: idx, c: 40})] = { v: retour.depart };
-                  if (retour.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 41})] = { v: retour.arrivee };
-                  ws[XLSX.utils.encode_cell({r: idx, c: 42})] = { v: refRetour }; // AQ (RÉFÉRENCE)
+                  if (retour.lieuDepart) ws[StyledXLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
+                  if (retour.correspondanceLieu) ws[StyledXLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu }; // AM (GARE CORRESP)
+                  if (retour.lieuArrivee) ws[StyledXLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
+                  if (retour.depart) ws[StyledXLSX.utils.encode_cell({r: idx, c: 40})] = { v: retour.depart };
+                  if (retour.arrivee) ws[StyledXLSX.utils.encode_cell({r: idx, c: 41})] = { v: retour.arrivee };
+                  ws[StyledXLSX.utils.encode_cell({r: idx, c: 42})] = { v: refRetour }; // AQ (RÉFÉRENCE)
                 }
                 if (hotel && hotel.nom) {
-                  ws[XLSX.utils.encode_cell({r: idx, c: 43})] = { v: hotel.nom }; // AR(43)
+                  ws[StyledXLSX.utils.encode_cell({r: idx, c: 43})] = { v: hotel.nom }; // AR(43)
                 }
               }
             }
         });
 
         // 3. Ajouter les participants qui n'étaient pas dans le fichier d'origine à la fin
+        let nextRow = rows.length;
         const unmatched = c.participants.filter(p => !matchedIds.has(p.id) && p.statut !== 'SUPPRIME');
         if (unmatched.length > 0) {
-          let nextRow = rows.length;
           unmatched.forEach(p => {
             // Identifier le médecin
             const names = p.nom.split(' ');
-            ws[XLSX.utils.encode_cell({r: nextRow, c: 10})] = { v: names[0] || '' }; // K
-            ws[XLSX.utils.encode_cell({r: nextRow, c: 11})] = { v: names.slice(1).join(' ') || '' }; // L
-            ws[XLSX.utils.encode_cell({r: nextRow, c: 15})] = { v: p.email }; // P
-            ws[XLSX.utils.encode_cell({r: nextRow, c: 14})] = { v: p.telephone }; // O
+            ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 10})] = { v: names[0] || '' }; // K
+            ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 11})] = { v: names.slice(1).join(' ') || '' }; // L
+            ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 15})] = { v: p.email }; // P
+            ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 14})] = { v: p.telephone }; // O
 
             if (p.logistique) {
               const aller = p.logistique.transports[0]?.aller;
@@ -1133,13 +1131,13 @@ export default function Dashboard() {
                 }
                 const refAller = refs.join(' + ');
 
-                if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
-                if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
-                if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 30})] = { v: aller.correspondanceLieu }; // AE (CORRESP)
-                if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuArrivee }; // AF
-                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.depart };      // AG
-                if (aller.arrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 33})] = { v: aller.arrivee }; // AH
-                ws[XLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: refAller };       // AI (RÉFÉRENCE)
+                if (aller.type) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
+                if (aller.lieuDepart) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
+                if (aller.correspondanceLieu) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 30})] = { v: aller.correspondanceLieu }; // AE (CORRESP)
+                if (aller.lieuArrivee) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuArrivee }; // AF
+                if (aller.depart) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.depart };      // AG
+                if (aller.arrivee) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 33})] = { v: aller.arrivee }; // AH
+                ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: refAller };       // AI (RÉFÉRENCE)
               }
               if (retour) {
                 let refs: string[] = [];
@@ -1151,22 +1149,29 @@ export default function Dashboard() {
                 }
                 const refRetour = refs.join(' + ');
 
-                if (retour.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
-                if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 38})] = { v: retour.correspondanceLieu }; // AM (CORRESP)
-                if (retour.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 40})] = { v: retour.depart };
-                ws[XLSX.utils.encode_cell({r: nextRow, c: 42})] = { v: refRetour }; // AQ (RÉFÉRENCE)
+                if (retour.type) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
+                if (retour.correspondanceLieu) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 38})] = { v: retour.correspondanceLieu }; // AM (CORRESP)
+                if (retour.depart) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 40})] = { v: retour.depart };
+                ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 42})] = { v: refRetour }; // AQ (RÉFÉRENCE)
               }
-              if (hotel && hotel.nom) ws[XLSX.utils.encode_cell({r: nextRow, c: 43})] = { v: hotel.nom };
+              if (hotel && hotel.nom) ws[StyledXLSX.utils.encode_cell({r: nextRow, c: 43})] = { v: hotel.nom };
             }
+            
+            // On applique le style à la nouvelle ligne créée
+            applyRowStyle(ws, nextRow, p);
+
             nextRow++;
           });
         }
 
-        const outB64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-        downloadBase64File(`data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${outB64}`, `Base_Sync_${c.nom}.xlsx`);
+        // --- APPLICATION FINALE ---
+        ensureSheetRange(ws, nextRow, 45);
+
+        const filename = `Export_${c.nom.replace(/ /g, '_')}_Style_Final.xlsx`;
+        StyledXLSX.writeFile(wb, filename, { cellStyles: true });
         return;
       } catch (err) {
-        console.error("Erreur Sync Export:", err);
+        console.error("Erreur Export avec Style:", err);
       }
     }
 
@@ -1192,11 +1197,11 @@ export default function Dashboard() {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataExcel);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Base de Données");
+    const ws = StyledXLSX.utils.json_to_sheet(dataExcel);
+    const wb = StyledXLSX.utils.book_new();
+    StyledXLSX.utils.book_append_sheet(wb, ws, "Base de Données");
 
-    XLSX.writeFile(wb, `Base_${c.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.xlsx`);
+    StyledXLSX.writeFile(wb, `Base_${c.nom.replace(/ /g, '_')}_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.xlsx`);
   };
 
   // ─── Actions Groupées ───
@@ -1233,7 +1238,7 @@ export default function Dashboard() {
   };
 
   // ─── Chargement DB (Supabase Uniquement) ───
-  const initializedRef = React.useRef(false);
+  
 
   React.useEffect(() => {
     async function initData() {
@@ -1427,6 +1432,9 @@ export default function Dashboard() {
             id: p.id,
             congres_id: c.id,
             nom: p.nom,
+            prenom: p.prenom || '',
+            date_naissance: p.dateNaissance || '',
+            sncf: p.sncf || '',
             email: p.email,
             telephone: p.telephone,
             ville_depart: p.villeDepart,
@@ -1489,7 +1497,7 @@ export default function Dashboard() {
   });
 
   // ─── Rendu ───────────────────────────────────────────────────────────────────
-  const participants = selectedCongres?.participants ?? [];
+  
   const activeParticipants = participants.filter(p => p.statut !== 'SUPPRIME');
   const deletedParticipants = participants.filter(p => p.statut === 'SUPPRIME');
 
@@ -2044,6 +2052,7 @@ export default function Dashboard() {
                     <span className={`cursor-pointer hover:text-blue-600 ${statusFilter === 'A_TRAITER' ? 'text-blue-600' : ''}`} onClick={() => setStatusFilter('A_TRAITER')}>À traiter</span>
                     <span className={`cursor-pointer hover:text-blue-600 ${statusFilter === 'ATTENTE_REPONSE' ? 'text-blue-600' : ''}`} onClick={() => setStatusFilter('ATTENTE_REPONSE')}>En cours</span>
                     <span className={`cursor-pointer hover:text-blue-600 ${statusFilter === 'VALIDE' ? 'text-blue-600' : ''}`} onClick={() => setStatusFilter('VALIDE')}>Validés</span>
+                    <span className={`cursor-pointer hover:text-blue-600 ${statusFilter === 'ANNULE' ? 'text-blue-600' : ''}`} onClick={() => setStatusFilter('ANNULE')}>Annulés</span>
                   </div>
                 </div>
 
@@ -2230,9 +2239,10 @@ export default function Dashboard() {
                             <td className="px-6 py-4 text-center">
                               <span className={`
                                 w-2.5 h-2.5 rounded-full inline-block shadow-sm ring-4 ring-offset-0 
-                                ${p.statut === 'VALIDE' ? 'bg-emerald-500 ring-emerald-50' :
-                                  p.statut === 'ATTENTE_REPONSE' ? 'bg-indigo-500 ring-indigo-50' :
-                                  'bg-amber-400 ring-amber-50'}
+                                ${p.statut === 'VALIDE' ? 'bg-emerald-700 ring-emerald-50' :
+                                  p.statut === 'ATTENTE_REPONSE' ? 'bg-blue-400 ring-blue-50' :
+                                  p.statut === 'ANNULE' ? 'bg-gray-400 ring-gray-100' :
+                                  'bg-white border border-gray-200 ring-gray-50 shadow-inner'}
                               `} title={p.statut}></span>
                             </td>
 
@@ -2249,8 +2259,25 @@ export default function Dashboard() {
                                 <button onClick={() => { setParticipantForDetails(p); setDetailsOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Voir l'itinéraire complet">
                                   <Eye className="w-4 h-4" />
                                 </button>
+                                {p.logistique && (
+                                  <button 
+                                    onClick={() => {
+                                      const text = generateAgencyMessage([p]);
+                                      const agencyEmail = "keisha.khoto-thinu@twobevents.fr";
+                                      const subject = `LOGISTIQUE AGENCE - ${selectedCongres?.nom.toUpperCase()} - ${p.nom.toUpperCase()}`;
+                                      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(agencyEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+                                      window.open(url, '_blank');
+                                      navigator.clipboard.writeText(text);
+                                      updateParticipants(selectedId!, ps => ps.map(part => part.id === p.id ? { ...part, dejaExporte: true } : part));
+                                    }} 
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all border border-blue-50" 
+                                    title="Envoyer cet itinéraire à l'agence (Individuel)"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 {p.logistique && p.statut === 'A_TRAITER' && (
-                                  <button onClick={() => handleGeneratePDFAndEmail(p)} disabled={loading} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50">
+                                  <button onClick={() => handleGeneratePDFAndEmail(p)} disabled={loading} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50" title="Envoyer invitation + PDF au médecin">
                                     {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MailCheck className="w-3.5 h-3.5" />}
                                   </button>
                                 )}
@@ -2262,6 +2289,15 @@ export default function Dashboard() {
                                 {p.statut === 'VALIDE' && (
                                   <button onClick={() => handleToggleBillet(p.id)} className={`p-2 rounded-lg ${p.billetsEnvoyes ? 'bg-fuchsia-600 text-white' : 'bg-fuchsia-100 text-fuchsia-600'}`}>
                                     <Ticket className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                 {p.statut !== 'ANNULE' ? (
+                                  <button onClick={() => updateParticipants(selectedId!, ps => ps.map(part => part.id === p.id ? { ...part, statut: 'ANNULE' } : part))} className="p-2 text-gray-300 hover:text-slate-600" title="Annuler le participant">
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button onClick={() => updateParticipants(selectedId!, ps => ps.map(part => part.id === p.id ? { ...part, statut: 'A_TRAITER' } : part))} className="p-2 text-gray-300 hover:text-blue-500" title="Restaurer le participant">
+                                    <RotateCcw className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                                 <button onClick={() => handleDeleteParticipant(p.id)} className="p-2 text-gray-300 hover:text-red-500">
@@ -2457,33 +2493,46 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex gap-4 items-center">
-                <div className="relative group">
-                  <button className="px-6 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 rounded-2xl font-black text-xs border-2 border-slate-100 dark:border-slate-700 hover:border-blue-200 transition-all flex items-center gap-3 shadow-xl hover:shadow-2xl hover:translate-y-[-2px]">
+                <div className="relative">
+                  <button 
+                    onClick={() => setCopyDropdownOpen(!copyDropdownOpen)}
+                    className="px-6 py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 rounded-2xl font-black text-xs border-2 border-slate-100 dark:border-slate-700 hover:border-blue-200 transition-all flex items-center gap-3 shadow-xl hover:shadow-2xl hover:translate-y-[-2px]"
+                  >
                     <Copy className="w-5 h-5" /> COPIER D'UN COLLÈGUE
                   </button>
-                  <div className="absolute right-0 top-[100%] mt-3 w-80 bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl border-2 border-slate-50 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden max-h-[400px] overflow-y-auto ring-1 ring-slate-100">
-                    {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).length === 0 ? (
-                      <div className="p-8 text-xs text-slate-400 text-center font-black italic">AUCUN DOSSIER DISPONIBLE</div>
-                    ) : (
-                      <div className="p-4 space-y-2">
-                        {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => {
-                              if (p.logistique) {
-                                setTransports(JSON.parse(JSON.stringify(p.logistique.transports)));
-                                setHotels(JSON.parse(JSON.stringify(p.logistique.hotels)));
-                              }
-                            }}
-                            className="w-full text-left px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-900 dark:text-slate-100 hover:text-blue-700 text-xs font-black rounded-2xl transition-all flex items-center justify-between group/item"
-                          >
-                            <span className="truncate flex-1">{p.nom}</span>
-                            <span className="text-[9px] font-black text-blue-500 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-lg opacity-0 group-hover/item:opacity-100 transition-opacity">COPIER</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {copyDropdownOpen && (
+                    <div className="absolute right-0 top-[100%] mt-3 w-80 bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl border-2 border-slate-50 dark:border-slate-700 z-[60] overflow-hidden max-h-[400px] overflow-y-auto ring-1 ring-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                      {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).length === 0 ? (
+                        <div className="p-8 text-xs text-slate-400 text-center font-black italic">AUCUN DOSSIER DISPONIBLE</div>
+                      ) : (
+                        <div className="p-4 space-y-2">
+                          {selectedCongres?.participants.filter(p => p.id !== currentParticipant.id && p.logistique).map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                if (p.logistique) {
+                                  const copiedTransports = p.logistique.transports && p.logistique.transports.length > 0
+                                    ? JSON.parse(JSON.stringify(p.logistique.transports))
+                                    : [propositionVide()];
+                                  const copiedHotels = p.logistique.hotels && p.logistique.hotels.length > 0
+                                    ? JSON.parse(JSON.stringify(p.logistique.hotels))
+                                    : [{ nom: '' }];
+                                  
+                                  setTransports(copiedTransports);
+                                  setHotels(copiedHotels);
+                                  setCopyDropdownOpen(false);
+                                }
+                              }}
+                              className="w-full text-left px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-900 dark:text-slate-100 hover:text-blue-700 text-xs font-black rounded-2xl transition-all flex items-center justify-between group/item"
+                            >
+                              <span className="truncate flex-1">{p.nom}</span>
+                              <span className="text-[9px] font-black text-blue-500 bg-blue-100 dark:bg-blue-900/50 px-3 py-1 rounded-lg opacity-0 group-hover/item:opacity-100 transition-opacity">COPIER</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => setModalOpen(false)} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-100 dark:border-slate-700 text-slate-400 hover:text-red-500 shadow-xl flex items-center justify-center transition-all hover:rotate-90 hover:scale-110">
                   <X className="w-10 h-10" />
@@ -2663,22 +2712,6 @@ export default function Dashboard() {
                     >
                       <Zap className="w-3.5 h-3.5 fill-indigo-600" /> Remplissage Intelligent
                     </button>
-                    {transports.length < 3 && (
-                      <button
-                        onClick={() => {
-                          const newProp = propositionVide();
-                          if (currentParticipant?.villeDepart) {
-                            const city = cleanCityForSearch(currentParticipant.villeDepart);
-                            newProp.aller.lieuDepart = city;
-                            newProp.retour.lieuArrivee = city;
-                          }
-                          setTransports(t => [...t, newProp]);
-                        }}
-                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all border border-blue-100"
-                      >
-                        + Ajouter une Option
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -2773,15 +2806,40 @@ export default function Dashboard() {
                                       <Train className="w-3 h-3 text-gray-300" />
                                       <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
                                     </div>
+                                    {!prop.aller.correspondanceLieu && (
+                                      <button 
+                                        onClick={() => updateTransport(idx, 'aller', 'correspondanceLieu', ' ')}
+                                        className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] font-black uppercase group/plus"
+                                      >
+                                        <Plus className="w-3 h-3 group-hover/plus:rotate-90 transition-transform" />
+                                        Ajouter une escale
+                                      </button>
+                                    )}
                                  </div>
                                </div>
                              </div>
 
                              {prop.aller.correspondanceLieu && (
                                <div className="mt-8 pt-6 border-t border-gray-50 dark:border-gray-800 border-dashed">
-                                  <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-6 h-6 bg-blue-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-blue-100 dark:shadow-none">2</div>
-                                    <label className="text-[11px] font-black text-blue-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 bg-blue-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-blue-100 dark:shadow-none">2</div>
+                                      <label className="text-[11px] font-black text-blue-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        updateTransportMulti(idx, 'aller', { 
+                                          correspondanceLieu: '', 
+                                          correspondanceHeure: '', 
+                                          correspondanceDate: '', 
+                                          correspondanceNumero: '', 
+                                          correspondanceDuree: '' 
+                                        });
+                                      }}
+                                      className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase flex items-center gap-1 transition-colors"
+                                    >
+                                      <X className="w-3 h-3" /> Supprimer
+                                    </button>
                                   </div>
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-4 bg-blue-50/10 dark:bg-blue-900/5 p-4 rounded-2xl border border-blue-50/30 dark:border-blue-900/10">
@@ -2893,15 +2951,40 @@ export default function Dashboard() {
                                       <Train className="w-3 h-3 text-gray-300" />
                                       <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
                                     </div>
+                                    {!prop.retour.correspondanceLieu && (
+                                      <button 
+                                        onClick={() => updateTransport(idx, 'retour', 'correspondanceLieu', ' ')}
+                                        className="flex items-center gap-2 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg border border-orange-100 dark:border-orange-800 hover:bg-orange-600 hover:text-white transition-all text-[10px] font-black uppercase group/plus"
+                                      >
+                                        <Plus className="w-3 h-3 group-hover/plus:rotate-90 transition-transform" />
+                                        Ajouter une escale
+                                      </button>
+                                    )}
                                  </div>
                                </div>
                              </div>
 
                              {prop.retour.correspondanceLieu && (
                                <div className="mt-8 pt-6 border-t border-gray-50 dark:border-gray-800 border-dashed">
-                                  <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-6 h-6 bg-orange-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-orange-100">2</div>
-                                    <label className="text-[11px] font-black text-orange-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 bg-orange-400 text-white rounded-full flex items-center justify-center text-[10px] font-black italic shadow-lg shadow-orange-100">2</div>
+                                      <label className="text-[11px] font-black text-orange-400 uppercase tracking-[0.1em]">Correspondance / Vol 2</label>
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        updateTransportMulti(idx, 'retour', { 
+                                          correspondanceLieu: '', 
+                                          correspondanceHeure: '', 
+                                          correspondanceDate: '', 
+                                          correspondanceNumero: '', 
+                                          correspondanceDuree: '' 
+                                        });
+                                      }}
+                                      className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase flex items-center gap-1 transition-colors"
+                                    >
+                                      <X className="w-3 h-3" /> Supprimer
+                                    </button>
                                   </div>
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-4 bg-orange-50/10 dark:bg-orange-900/5 p-4 rounded-2xl border border-orange-50/30 dark:border-orange-900/10">
@@ -3141,15 +3224,50 @@ export default function Dashboard() {
             </div>
 
             <div className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Nom Complet</label>
-                <input
-                  type="text"
-                  className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
-                  value={tempNom}
-                  onChange={e => setTempNom(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Nom</label>
+                  <input
+                    type="text"
+                    className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                    value={tempNom}
+                    onChange={e => setTempNom(e.target.value || '')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Prénom</label>
+                  <input
+                    type="text"
+                    className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                    value={tempPrenom}
+                    onChange={e => setTempPrenom(e.target.value || '')}
+                  />
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Date de Naissance</label>
+                  <input
+                    type="text"
+                    placeholder="JJ/MM/AAAA"
+                    className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                    value={tempBirth}
+                    onChange={e => setTempBirth(e.target.value || '')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">SNCF / Fidélité</label>
+                  <input
+                    type="text"
+                    placeholder="N° de carte"
+                    className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
+                    value={tempSNCF}
+                    onChange={e => setTempSNCF(e.target.value || '')}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email</label>
                 <div className="relative">
@@ -3158,7 +3276,7 @@ export default function Dashboard() {
                     type="email"
                     className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
                     value={tempEmail}
-                    onChange={e => setTempEmail(e.target.value)}
+                    onChange={e => setTempEmail(e.target.value || '')}
                     placeholder="exemple@mail.com"
                   />
                 </div>
@@ -3169,7 +3287,7 @@ export default function Dashboard() {
                   type="text"
                   className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
                   value={tempPhone}
-                  onChange={e => setTempPhone(e.target.value)}
+                  onChange={e => setTempPhone(e.target.value || '')}
                   placeholder="06 -- -- -- --"
                 />
               </div>

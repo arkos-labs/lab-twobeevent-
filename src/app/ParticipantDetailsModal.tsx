@@ -1,6 +1,6 @@
 // ParticipantDetailsModal.tsx – Professional view of a participant's itinerary and hotel schedule
 import React from 'react';
-import { X, Clock, Plane, Train, Users, MapPin, ArrowRight } from 'lucide-react';
+import { X, Clock, Plane, Train, Users, MapPin, ArrowRight, Calendar } from 'lucide-react';
 import type { Participant, Trajet } from '@/lib/types';
 
 interface Props {
@@ -77,10 +77,22 @@ export const ParticipantDetailsModal: React.FC<Props> = ({ open, onClose, partic
               {participant.nom.charAt(0)}
             </div>
             <div>
-              <h3 className="text-4xl font-black tracking-tight text-gray-900">{participant.nom}</h3>
-              <div className="flex items-center gap-4 mt-2">
+              <h3 className="text-4xl font-black tracking-tight text-gray-900">
+                {participant.nom} {participant.prenom}
+              </h3>
+              <div className="flex flex-wrap items-center gap-4 mt-2">
                 <span className="text-[11px] font-black uppercase bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl tracking-[0.2em]">Fiche Voyageur Pro</span>
                 <span className="text-xs font-black text-gray-500 flex items-center gap-1.5"><MapPin className="w-4 h-4 text-red-500" /> {participant.villeDepart}</span>
+                {participant.dateNaissance && (
+                  <span className="text-xs font-black text-gray-500 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-blue-500" /> Né(e) le {participant.dateNaissance}
+                  </span>
+                )}
+                {participant.sncf && (
+                  <span className="text-xs font-black text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">
+                    <Train className="w-4 h-4" /> SNCF: {participant.sncf}
+                  </span>
+                )}
               </div>
             </div>
           </div>
