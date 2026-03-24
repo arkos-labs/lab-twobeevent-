@@ -1019,6 +1019,20 @@ export default function Dashboard() {
 
             if (p) {
               matchedIds.add(p.id);
+              
+              if (p.statut === 'SUPPRIME') {
+                // On marque le nom de façon visible
+                ws[XLSX.utils.encode_cell({r: idx, c: 11})] = { v: (String(row['L'] || '') + " [ANNULÉ]").trim() };
+                
+                // On vide les colonnes logistiques pour éviter toute confusion
+                const colsToClear = [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43];
+                colsToClear.forEach(col => {
+                  const addr = XLSX.utils.encode_cell({ r: idx, c: col });
+                  if (ws[addr]) ws[addr] = { v: '', t: 's' };
+                });
+                return; // Ne pas remplir les détails
+              }
+
               if (p.logistique) {
                 const aller = p.logistique.transports[0]?.aller;
                 const retour = p.logistique.transports[0]?.retour;
@@ -1142,22 +1156,26 @@ export default function Dashboard() {
     }
 
     // Fallback : Export standard
-    const dataExcel = c.participants.map(p => ({
-      "Médecin": p.nom,
-      "Email": p.email,
-      "Téléphone": p.telephone,
-      "Ville de départ": p.villeDepart,
-      "Statut Participant": p.statut,
-      "Billet envoyé": p.billetsEnvoyes ? 'Oui' : 'Non',
-      "Traité agence": p.dejaExporte ? 'Oui' : 'Non',
-      "Options Choisies": p.optionsChoisies || '',
-      "Transport Aller": p.logistique?.transports && p.logistique.transports[0]?.aller.numero ? `N° ${p.logistique.transports[0].aller.numero} (${p.logistique.transports[0].aller.depart} -> ${p.logistique.transports[0].aller.arrivee})` : '',
-      "Correspondance Aller": p.logistique?.transports && p.logistique.transports[0]?.aller.correspondanceLieu ? `${p.logistique.transports[0].aller.correspondanceLieu} (le ${p.logistique.transports[0].aller.correspondanceDate} à ${p.logistique.transports[0].aller.correspondanceHeure}) - N° ${p.logistique.transports[0].aller.correspondanceNumero || '?'}` : '',
-      "Transport Retour": p.logistique?.transports && p.logistique.transports[0]?.retour.numero ? `N° ${p.logistique.transports[0].retour.numero} (${p.logistique.transports[0].retour.depart} -> ${p.logistique.transports[0].retour.arrivee})` : '',
-      "Correspondance Retour": p.logistique?.transports && p.logistique.transports[0]?.retour.correspondanceLieu ? `${p.logistique.transports[0].retour.correspondanceLieu} (le ${p.logistique.transports[0].retour.correspondanceDate} à ${p.logistique.transports[0].retour.correspondanceHeure}) - N° ${p.logistique.transports[0].retour.correspondanceNumero || '?'}` : '',
-      "Hôtel": p.logistique?.hotels && p.logistique.hotels.length > 0 ? p.logistique.hotels[0].nom : '',
-      "Dates Hôtel": p.logistique?.hotels && p.logistique.hotels.length > 0 && p.logistique.hotels[0].checkIn ? `Du ${p.logistique.hotels[0].checkIn} au ${p.logistique.hotels[0].checkOut || '?'}` : ''
-    }));
+    const dataExcel = c.participants.map(p => {
+      const isSupp = p.statut === 'SUPPRIME';
+      const log = p.logistique;
+      return {
+        "Médecin": isSupp ? `${p.nom} [ANNULÉ]` : p.nom,
+        "Email": p.email,
+        "Téléphone": p.telephone,
+        "Ville de départ": p.villeDepart,
+        "Statut Participant": p.statut,
+        "Billet envoyé": p.billetsEnvoyes ? 'Oui' : 'Non',
+        "Traité agence": p.dejaExporte ? 'Oui' : 'Non',
+        "Options Choisies": p.optionsChoisies || '',
+        "Transport Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.numero ? `N° ${log.transports[0].aller.numero} (${log.transports[0].aller.depart} -> ${log.transports[0].aller.arrivee})` : ''),
+        "Correspondance Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.correspondanceLieu ? `${log.transports[0].aller.correspondanceLieu} (le ${log.transports[0].aller.correspondanceDate} à ${log.transports[0].aller.correspondanceHeure}) - N° ${log.transports[0].aller.correspondanceNumero || '?'}` : ''),
+        "Transport Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.numero ? `N° ${log.transports[0].retour.numero} (${log.transports[0].retour.depart} -> ${log.transports[0].retour.arrivee})` : ''),
+        "Correspondance Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.correspondanceLieu ? `${log.transports[0].aller.correspondanceLieu} (le ${log.transports[0].aller.correspondanceDate} à ${log.transports[0].aller.correspondanceHeure}) - N° ${log.transports[0].aller.correspondanceNumero || '?'}` : ''),
+        "Hôtel": isSupp ? "" : (log?.hotels && log.hotels.length > 0 ? log.hotels[0].nom : ''),
+        "Dates Hôtel": isSupp ? "" : (log?.hotels && log.hotels.length > 0 && log.hotels[0].checkIn ? `Du ${log.hotels[0].checkIn} au ${log.hotels[0].checkOut || '?'}` : '')
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dataExcel);
     const wb = XLSX.utils.book_new();
