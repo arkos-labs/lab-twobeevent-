@@ -47,11 +47,19 @@ function extractAllDetails() {
       }
     });
 
-    // RECHERCHE AGGRESSIVE DES NUMÉROS DE TRAIN (PLUSIEURS SEGMENTS)
-    const trainKeywords = "TGV|OUIGO|TER|INTERCITES|INOUI|ICE|LYRIA|THALYS|EUROSTAR";
-    const trainReg = new RegExp(`\\b(${trainKeywords})\\s*(\\d{2,6})\\b`, "gi");
-    const allTrainFindings = Array.from(fullText.matchAll(trainReg)).map(m => `${m[1].toUpperCase()} ${m[2]}`);
-    const uniqueTrainNums = [...new Set(allTrainFindings)];
+    // RECHERCHE ULTRA-AGGRESSIVE (Numéros de Train, Vol, Bus, Car)
+    const trainKeywords = "TGV|OUIGO|TER|INTERCITES|INOUI|ICE|LYRIA|THALYS|EUROSTAR|CAR|BUS|VOL|FLIGHT|TRAIN";
+    const trainReg = new RegExp(`\\b(${trainKeywords})?\\s*(\\d{4,6})\\b`, "gi");
+    const allFindings = [];
+    let match;
+    while ((match = trainReg.exec(fullText)) !== null) {
+      const type = (match[1] || "TRAIN").toUpperCase();
+      const num = match[2];
+      if (!["2024", "2025", "2026"].includes(num)) {
+        allFindings.push(`${type} ${num}`);
+      }
+    }
+    const uniqueTrainNums = [...new Set(allFindings)];
     
     if (times.length >= 2) {
       data.transport = {
@@ -61,7 +69,7 @@ function extractAllDetails() {
           lieuArrivee: stations[stations.length - 1] || "Inconnu",
           depart: times[0],
           arrivee: times[times.length - 1],
-          numero: uniqueTrainNums.join(' / ') || (allTrainFindings[0] || ""),
+          numero: uniqueTrainNums.join(' / '),
           date: "", 
           correspondanceLieu: ""
         },
