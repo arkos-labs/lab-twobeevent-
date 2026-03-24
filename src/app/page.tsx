@@ -2469,6 +2469,11 @@ export default function Dashboard() {
                           
                           if (resRetour) transport.retour = { ...transport.retour, ...resRetour };
                           
+                          // Fallback sécurité : si la gare de départ est vide, on prend celle de la plateforme
+                          if (!transport.aller.lieuDepart && currentParticipant.villeDepart) {
+                             transport.aller.lieuDepart = currentParticipant.villeDepart;
+                          }
+                          
                           return transport;
                         };
 
