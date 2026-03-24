@@ -367,30 +367,48 @@ export default function Dashboard() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: '' });
 
-      // Filtrer les lignes vides
-      let rows = data.filter(r => r['K'] || r['L']);
+      const headerRow = data[0] || {};
+      const colMap = { prenom: 'K', nom: 'L', email: 'P', telephone: 'O', cp: 'T', ville: 'U', etablissement: 'Q' };
 
-      // Essayer de détecter l'en-tête (qui contient 'prénom', 'nom', ou 'first name' en colonne K ou L)
-      if (rows.length > 0) {
-        const strK = String(rows[0]['K']).toLowerCase();
-        const strL = String(rows[0]['L']).toLowerCase();
-        if (strK.includes('prénom') || strK.includes('prenom') || strK.includes('name') || strL.includes('nom') || strL.includes('name')) {
-          rows.shift(); // On enlève la première ligne car c'est un en-tête
+      // Détection intelligente des colonnes
+      Object.entries(headerRow).forEach(([col, val]) => {
+        const sVal = String(val).toLowerCase();
+        if (sVal.includes('prénom') || sVal.includes('prenom') || sVal.includes('first name')) colMap.prenom = col;
+        if (sVal.includes('nom') || sVal.includes('last name') || sVal === 'name') colMap.nom = col;
+        if (sVal.includes('email') || sVal.includes('mail')) colMap.email = col;
+        if (sVal.includes('téléphone') || sVal.includes('phone') || sVal.includes('tel')) colMap.telephone = col;
+        if (sVal.includes('ville') || sVal.includes('city') || sVal.includes('départ')) colMap.ville = col;
+        if (sVal.includes('postal') || sVal.includes('code p')) colMap.cp = col;
+        if (sVal.includes('établissement') || sVal.includes('société') || sVal.includes('structure')) colMap.etablissement = col;
+      });
+
+      // Filtrer les lignes qui ont au moins un nom ou un email
+      let rows = data.filter((r, idx) => {
+        if (idx === 0) {
+          // On ignore la ligne d'en-tête si elle contient "nom" ou "email"
+          const valNom = String(r[colMap.nom]).toLowerCase();
+          if (valNom.includes('nom') || valNom.includes('name')) return false;
         }
+        return r[colMap.nom] || r[colMap.prenom] || r[colMap.email];
+      });
+
+      if (rows.length === 0) {
+        alert("Aucun participant n'a été détecté dans le fichier. Vérifiez que les colonnes comportent des en-têtes (Nom, Prénom, Email, etc.).");
+        return;
       }
 
       const imported: Participant[] = rows.map((row) => {
-        const prenom = String(row['K'] || '').trim();
-        const nom = String(row['L'] || '').trim();
-        const email = String(row['P'] || '').trim();
-        const telephone = String(row['O'] || '').trim();
-        const codePostal = String(row['T'] || '').trim();
-        const ville = String(row['U'] || '').trim();
-        const etablissement = String(row['Q'] || '').trim();
+        const prenom = String(row[colMap.prenom] || '').trim();
+        const nom = String(row[colMap.nom] || '').trim();
+        const email = String(row[colMap.email] || '').trim();
+        const telephone = String(row[colMap.telephone] || '').trim();
+        const codePostal = String(row[colMap.cp] || '').trim();
+        const ville = String(row[colMap.ville] || '').trim();
+        const etablissement = String(row[colMap.etablissement] || '').trim();
 
         return {
           id: generateId(),
-          nom: `${prenom} ${nom}`.trim() || 'Inconnu',
+          nom: `${prenom} ${nom}`.trim() || (email ? email.split('@')[0] : 'Inconnu'),
           email,
           telephone,
           villeDepart: ville
@@ -407,14 +425,11 @@ export default function Dashboard() {
         r.readAsDataURL(file);
       });
 
-      // Mise à jour intelligente (Sync) : On synchronise avec le fichier source
+      // Mise à jour intelligente (Sync)
       setCongres(prev => prev.map(c => {
         if (c.id !== selectedId) return c;
-
-        // 1. On prépare la liste des participants qui existent déjà
         let mergedParticipants = [...c.participants];
         
-        // 2. On met à jour ou on ajoute ceux du fichier Excel
         imported.forEach(imp => {
           const idx = mergedParticipants.findIndex(p => 
             (imp.email && p.email.toLowerCase() === imp.email.toLowerCase()) ||
@@ -422,35 +437,29 @@ export default function Dashboard() {
           );
 
           if (idx !== -1) {
-            // Mise à jour de l'existant
             mergedParticipants[idx] = {
               ...mergedParticipants[idx],
               telephone: imp.telephone || mergedParticipants[idx].telephone,
               villeDepart: imp.villeDepart || mergedParticipants[idx].villeDepart,
-              // On garde le statut existant s'il n'est plus à traiter
               statut: mergedParticipants[idx].statut === 'A_TRAITER' ? imp.statut : mergedParticipants[idx].statut
             };
           } else {
-            // Nouveau participant
             mergedParticipants.push(imp);
           }
         });
 
-        // 3. SUPPRESSION : Si un participant n'est plus dans le fichier Excel 
-        // ET qu'il était encore au statut "A_TRAITER", on le retire.
         const finalParticipants = mergedParticipants.filter(p => {
           const existsInImport = imported.some(imp => 
             (imp.email && p.email.toLowerCase() === imp.email.toLowerCase()) ||
             (p.nom.toLowerCase() === imp.nom.toLowerCase())
           );
-          // On garde si : présent dans le fichier OU si déjà validé/en attente (sécurité donnée)
           return existsInImport || p.statut !== 'A_TRAITER';
         });
 
         return { ...c, participants: finalParticipants, logisticsTemplate: base64 };
       }));
 
-      console.log(`✅ Import terminé : ${imported.length} lignes traitées.`);
+      alert(`✅ Import réussi : ${imported.length} participants ajoutés ou mis à jour.`);
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -501,6 +510,20 @@ export default function Dashboard() {
     if (andEmail) {
       handleGeneratePDFAndEmail(updatedPart);
     }
+  };
+
+  const handleDeleteLogistique = () => {
+    if (!currentParticipant || !selectedId) return;
+    if (!window.confirm("Supprimer complètement toute la logistique (transports et hôtels) de ce participant ?")) return;
+    
+    setTransports([propositionVide()]);
+    setHotels([{ nom: '' }]);
+    
+    const updatedPart: Participant = { ...currentParticipant, logistique: undefined };
+    updateParticipants(selectedId, ps =>
+      ps.map(p => p.id === currentParticipant.id ? updatedPart : p)
+    );
+    setModalOpen(false);
   };
 
   // ─── Gmail ───────────────────────────────────────────────────────────────────
@@ -1172,7 +1195,10 @@ export default function Dashboard() {
         const { data: dataHistory } = await supabase.from('export_history').select('*');
         const { data: dataSettings } = await supabase.from('settings').select('*').eq('id', 1).single();
 
-        if (initializedRef.current) return;
+        if (initializedRef.current) {
+          setLoading(false);
+          return;
+        }
 
         let finalCongres: Congres[] = [];
         let finalHistory: ExportHistory[] = [];
@@ -1224,39 +1250,66 @@ export default function Dashboard() {
       }, (payload: any) => {
         if (!payload.new || !payload.new.id) return;
         
+        // Si on est en train de sauvegarder localement, on ignore les événements Realtime 
+        // qui ne sont que des échos de nos propres actions, pour éviter d'écraser le state local.
+        if (isRealtimeUpdate.current) {
+          console.log("⏭️ [Realtime] Événement ignoré (Verrou local actif)");
+          return;
+        }
+
         const updatedPart = normalizeParticipant(payload.new);
-        const congresId = payload.new.congres_id;
+        const rawCongresId = payload.new.congres_id;
 
         // 1. Désactiver temporairement la synchro montante pour éviter la boucle
+        // On ne le fait QUE si on n'est pas déjà en train de sauvegarder localement
         isRealtimeUpdate.current = true;
         
-        // 2. Mettre à jour l'état global
-        setCongres(prev => prev.map(c => 
-          c.id === congresId 
-            ? { 
+        // 2. Mettre à jour l'état global en fusionnant les données
+        setCongres(prev => {
+          let targetId = rawCongresId;
+          if (!targetId) {
+             const found = prev.find(c => c.participants.some(p => p.id === updatedPart.id));
+             if (found) targetId = found.id;
+          }
+
+          return prev.map(c => {
+            const isTargetCongress = c.id === targetId || c.participants.some(p => p.id === updatedPart.id);
+            if (isTargetCongress) {
+              const exists = c.participants.some(p => p.id === updatedPart.id);
+              return { 
                 ...c, 
-                participants: c.participants.some(p => p.id === updatedPart.id)
-                  ? c.participants.map(p => p.id === updatedPart.id ? updatedPart : p)
+                participants: exists
+                  ? c.participants.map(p => p.id === updatedPart.id ? { ...p, ...updatedPart } : p)
                   : [...c.participants, updatedPart]
-              }
-            : c
-        ));
+              };
+            }
+            return c;
+          });
+        });
 
         // 3. Mettre à jour les vues ouvertes si c'est le même participant
-        setCurrentParticipant(prev => prev?.id === updatedPart.id ? updatedPart : prev);
-        if (updatedPart.logistique) {
-          setTransports(prev => currentParticipant?.id === updatedPart.id ? updatedPart.logistique!.transports : prev);
-          setHotels(prev => currentParticipant?.id === updatedPart.id ? updatedPart.logistique!.hotels : prev);
-        }
-        setParticipantForDetails(prev => prev?.id === updatedPart.id ? updatedPart : prev);
+        setCurrentParticipant(prev => {
+            if (prev?.id === updatedPart.id) {
+                const merged = { ...prev, ...updatedPart };
+                if (updatedPart.logistique) {
+                  setTransports(merged.logistique?.transports || []);
+                  setHotels(merged.logistique?.hotels || []);
+                }
+                return merged;
+            }
+            return prev;
+        });
+        
+        setParticipantForDetails(prev => prev?.id === updatedPart.id ? { ...prev, ...updatedPart } : prev);
         
         // 4. Feedback visuel
         setSyncStatus('SUCCESS');
         setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 2000);
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log(`🔌 [Realtime] Statut de connexion: ${status}`);
+      });
 
-    // -- Canal pour la table congres (Modèles et réglages) --
     const congressChannel = supabase
       .channel('realtime-congres')
       .on('postgres_changes', { 
@@ -1265,9 +1318,14 @@ export default function Dashboard() {
         table: 'congres' 
       }, (payload: any) => {
         if (!payload.new || !payload.new.id) return;
+        
+        if (isRealtimeUpdate.current) {
+          console.log("⏭️ [Realtime] Mise à jour Congrès ignorée (Verrou local actif)");
+          return;
+        }
+
         const updatedRaw = payload.new;
         setCongres(prev => {
-          // On récupère tous les participants actuels de l'état pour la normalisation
           const currentAllParticipants = prev.flatMap(c => c.participants);
           const normalized = normalizeCongres(updatedRaw, currentAllParticipants);
           return prev.map(c => c.id === updatedRaw.id ? normalized : c);
@@ -1279,22 +1337,26 @@ export default function Dashboard() {
       supabase.removeChannel(channel);
       supabase.removeChannel(congressChannel);
     };
-  }, [loading, currentParticipant?.id]);
+  }, [loading]);
 
-  // ─── Synchronisation Supabase Uniquement ───
+  // ─── Synchronisation Supabase Uniquement (Debounced) ───
   React.useEffect(() => {
     if (loading) return;
     if (!initializedRef.current || congres.length === 0) return;
     
+    // Si une mise à jour Realtime vient d'avoir lieu (dans les 3 dernières secondes), 
+    // on ne synchronise pas vers le haut pour éviter l'écho et la boucle infinie.
     if (isRealtimeUpdate.current) {
-      isRealtimeUpdate.current = false;
+      // On laisse le flag à true, il sera réinitialisé plus tard ou par un timeout
+      // Ce useEffect se déclenchera à nouveau au prochain changement
       return;
     }
 
     const syncToDB = async () => {
+      // Activer le verrou immédiatement pour ignorer les échos Realtime à venir
+      isRealtimeUpdate.current = true;
       setSyncStatus('SYNCING');
       try {
-        // 1. Upsert des données principales
         const congresPayload = congres.map(c => ({
           id: c.id,
           nom: c.nom,
@@ -1331,55 +1393,42 @@ export default function Dashboard() {
         );
 
         const historyPayload = exportHistory.map((h, i) => ({
-          id: h.id || `${h.date}-${i}`,
           date: h.date,
           description: h.congresName,
           nb_participants: h.count
         }));
 
-        // Exécution des Upserts
         await supabase.from('congres').upsert(congresPayload);
         await supabase.from('participants').upsert(allParticipants);
         await supabase.from('export_history').upsert(historyPayload);
 
-        // 2. NETTOYAGE (DELETE) - ORDRE CRITIQUE : PARTICIPANTS D'ABORD
-        // A. Participants
-        const { data: dbParticipants } = await supabase.from('participants').select('id');
-        const currentPIds = allParticipants.map(p => p.id);
-        const pToDelete = (dbParticipants || []).map((r: any) => r.id).filter((id: string) => !currentPIds.includes(id));
-        if (pToDelete.length > 0) {
-          await supabase.from('participants').delete().in('id', pToDelete);
-        }
-
-        // B. Congrès
-        const { data: dbCongres } = await supabase.from('congres').select('id');
-        const currentCIds = congresPayload.map(c => c.id);
-        const cToDelete = (dbCongres || []).map((r: any) => r.id).filter((id: string) => !currentCIds.includes(id));
-        if (cToDelete.length > 0) {
-          await supabase.from('congres').delete().in('id', cToDelete);
-        }
-
-        // C. Historique
-        const { data: dbHistory } = await supabase.from('export_history').select('id');
-        const currentHIds = historyPayload.map(h => h.id);
-        const hToDelete = (dbHistory || []).map((r: any) => r.id).filter((id: string) => !currentHIds.includes(id));
-        if (hToDelete.length > 0) {
-          await supabase.from('export_history').delete().in('id', hToDelete);
-        }
-
+        // Suppression du bloc de "nettoyage" (delete not in) car il est trop dangereux 
+        // et provoque des disparitions de données lors des imports massifs.
+        
         setSyncStatus('SUCCESS');
         setDbError(null);
-        setTimeout(() => setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev), 3000);
+        
+        // On garde le verrou pendant encore 2 secondes après la fin de la sauvegarde
+        // pour laisser le temps aux événements Realtime (échos) de passer sans écraser le state.
+        setTimeout(() => {
+           isRealtimeUpdate.current = false;
+           setSyncStatus(prev => prev === 'SUCCESS' ? 'IDLE' : prev);
+        }, 3000);
 
       } catch (err: any) {
-        console.warn("Sync Issue (UI Not Blocked):", err);
+        console.warn("Sync Issue:", err);
+        isRealtimeUpdate.current = false; // On déverrouille en cas d'erreur
         setSyncStatus('ERROR');
         setDbError(err.message || String(err));
       }
     };
 
-    syncToDB();
+    // Debounce de 1.5s pour laisser l'interface souffler
+    const handler = setTimeout(syncToDB, 1500);
+    return () => clearTimeout(handler);
   }, [congres, exportHistory, emailTemplate]);
+
+  // Suppression du useEffect de réinitialisation automatique du flag car il entrait en conflit avec syncToDB
 
   // ─── Filtrage ─────────────────────────────────────────────────────────────
   const filteredParticipants = (selectedCongres?.participants ?? []).filter(p => {
@@ -2658,10 +2707,6 @@ export default function Dashboard() {
                                       <Train className="w-3 h-3 text-gray-300" />
                                       <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.aller.numero} onChange={e => updateTransport(idx, 'aller', 'numero', e.target.value)} />
                                     </div>
-                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
-                                      <Users className="w-3 h-3 text-gray-300" />
-                                      <input type="text" placeholder="PLACEMENT (VOITURE 4, PLACE 52...)" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 flex-1 focus:ring-0" value={prop.aller.placement || ''} onChange={e => updateTransport(idx, 'aller', 'placement', e.target.value)} />
-                                    </div>
                                  </div>
                                </div>
                              </div>
@@ -2773,10 +2818,6 @@ export default function Dashboard() {
                                     <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
                                       <Train className="w-3 h-3 text-gray-300" />
                                       <input type="text" placeholder="N° DE TRAIN / VOL" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 w-32 focus:ring-0" value={prop.retour.numero} onChange={e => updateTransport(idx, 'retour', 'numero', e.target.value)} />
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-3 py-1 rounded-lg">
-                                      <Users className="w-3 h-3 text-gray-300" />
-                                      <input type="text" placeholder="PLACEMENT" className="bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-500 placeholder:text-gray-300 flex-1 focus:ring-0" value={prop.retour.placement || ''} onChange={e => updateTransport(idx, 'retour', 'placement', e.target.value)} />
                                     </div>
                                  </div>
                                </div>
@@ -2921,22 +2962,11 @@ export default function Dashboard() {
                 <MailCheck className="w-5 h-5" /> Enregistrer & Envoyer
               </button>
               <button 
-                onClick={async () => {
-                  const cong = congres.find(c => c.id === selectedId);
-                  if (!cong || !currentParticipant) return;
-                  console.log("🧪 Test Manuel lancé pour :", currentParticipant.nom);
-                  const isJNI = isJNIEvent(cong.nom);
-                  const bull = cong.bulletinTemplate || (isJNI ? 'data:application/pdf;base64,' + JNI_BULLETIN_PDF : null);
-                  const logi = cong.logisticsTemplate || (isJNI ? 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + JNI_EXCEL : null);
-
-                  if (bull) await fillAndDownloadTemplate(bull, currentParticipant, cong, 'Test_Bulletin');
-                  if (logi) await fillAndDownloadTemplate(logi, currentParticipant, cong, 'Test_Logistique');
-                  if (!bull && !logi) alert("Aucun modèle configuré.");
-                }}
-                className="px-6 py-5 bg-emerald-50 text-emerald-600 rounded-3xl font-black text-xs hover:bg-emerald-100 transition-all flex items-center gap-2"
-                title="Tester le remplissage Docx/Xlsx"
+                onClick={handleDeleteLogistique}
+                className="px-6 py-5 bg-red-50 text-red-600 rounded-3xl font-black text-xs hover:bg-red-100 transition-all flex items-center gap-2"
+                title="Supprimer toute la logistique saisie pour ce participant"
               >
-                <FileText className="w-4 h-4" /> TESTER
+                <Trash2 className="w-4 h-4" /> SUPPRIMER LA PROPOSITION
               </button>
               <button onClick={() => saveLogistique(false)} className="flex-1 py-5 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-xl shadow-blue-100 hover:translate-y-[-2px] transition-all">
                 Enregistrer
