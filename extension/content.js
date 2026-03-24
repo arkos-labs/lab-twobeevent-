@@ -49,6 +49,9 @@ function extractAllDetails() {
     });
 
     if (times.length >= 2) {
+      // Nettoyage et unicité des numéros de train
+      const uniqueTrainNums = [...new Set(trainNums)];
+      
       data.transport = {
         aller: {
           type: "TRAIN",
@@ -56,8 +59,8 @@ function extractAllDetails() {
           lieuArrivee: stations[stations.length - 1] || "Inconnu",
           depart: times[0],
           arrivee: times[times.length - 1],
-          numero: trainNums[0] || "",
-          date: "", // SNCF est complexe pour la date, on laisse vide pour l'instant
+          numero: uniqueTrainNums.join(' / ') || "",
+          date: "", 
           correspondanceLieu: ""
         },
         site: "SNCF Connect",
@@ -108,6 +111,11 @@ function extractAllDetails() {
               lieuArrivee: legs[idx+1]?.iata || "",
               numero: flightNums[idx] || flightNums[0] || ""
           })).slice(0, -1);
+          
+          // After creating segments, update the main 'aller' object's numero
+          // to join all segment numbers, similar to what prepareData would do.
+          const allNums = [...new Set(aller.segments.map(s => s.numero).filter(n => !!n))];
+          aller.numero = allNums.join(' / ') || aller.numero;
       }
 
       let retour = null;
