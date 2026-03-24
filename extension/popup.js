@@ -162,13 +162,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!data || !data.segments || data.segments.length === 0) return data;
                 const first = data.segments[0];
                 const last = data.segments[data.segments.length - 1];
+                // On récupère tous les numéros uniques de tous les segments
+                const allNums = [...new Set(data.segments.map(s => s.numero).filter(n => !!n))];
                 return {
                     ...data,
                     depart: first.depart,
                     lieuDepart: first.lieuDepart,
                     arrivee: last.arrivee,
                     lieuArrivee: last.lieuArrivee,
-                    numero: first.numero,
+                    numero: allNums.join(' / ') || first.numero,
                     segments: data.segments
                 };
             };
