@@ -77,6 +77,8 @@ export interface Congres {
   };
   bulletinTemplate?: string;   // Base64 Docx/XLSX
   logisticsTemplate?: string;  // Base64 Docx/XLSX
+  logo?: string;               // Base64 PNG/JPG
+  signature?: string;          // Base64 PNG/JPG
 }
 
 export interface ExportHistory {

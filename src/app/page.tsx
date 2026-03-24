@@ -1561,7 +1561,7 @@ export default function Dashboard() {
               </div>
             )}
             {syncStatus === 'SUCCESS' && (
-              <div className="flex items-center gap-2 text-[10px] font-black italic text-emerald-500 bg-emerald-px-3 py-1.5 rounded-lg">
+              <div className="flex items-center gap-2 text-[10px] font-black italic text-emerald-500 bg-emerald-50 px-3 py-1.5 rounded-lg">
                 <CheckCircle2 className="w-3 h-3" /> Sauvegardé
               </div>
             )}
