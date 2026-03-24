@@ -986,15 +986,20 @@ export default function Dashboard() {
                 const hotel = p.logistique.hotels[0];
 
                 if (aller) {
-                  // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) RÉFÉRENCE, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
-                  // Extraction robuste de la référence
+                  // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) GARE CORRESP, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) RÉFÉRENCE
+                  
+                  // Construction propre depuis les segments prioritairement
                   let refs: string[] = [];
-                  if (aller.numero) refs.push(aller.numero);
-                  if (aller.correspondanceNumero) refs.push(aller.correspondanceNumero);
                   if (aller.segments && aller.segments.length > 0) {
-                    aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
+                      aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                   }
-                  const refAller = refs.length > 0 ? refs.join(' + ') : '';
+                  // Fallback si pas de segments
+                  if (refs.length === 0 && aller.numero) {
+                      // On nettoie si le numéro contient + (on ne garde que le premier si c'est pollué)
+                      refs.push(aller.numero.split(' + ')[0]);
+                  }
+                  
+                  const refAller = refs.join(' + ');
 
                   if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                   if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
@@ -1007,12 +1012,14 @@ export default function Dashboard() {
                 if (retour) {
                   // RETOUR : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) Corresp, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
                   let refs: string[] = [];
-                  if (retour.numero) refs.push(retour.numero);
-                  if (retour.correspondanceNumero) refs.push(retour.correspondanceNumero);
                   if (retour.segments && retour.segments.length > 0) {
-                    retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
+                      retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                   }
-                  const refRetour = refs.length > 0 ? refs.join(' + ') : '';
+                  if (refs.length === 0 && retour.numero) {
+                      // Si pollué, on essaie de prendre les parties après le 1er ou 2eme train (dangereux mais mieux que rien)
+                      refs.push(retour.numero);
+                  }
+                  const refRetour = refs.join(' + ');
 
                   if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
                   if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
@@ -1050,12 +1057,13 @@ export default function Dashboard() {
               if (aller) {
                 // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) GARE CORRESP, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) RÉFÉRENCE
                 let refs: string[] = [];
-                if (aller.numero) refs.push(aller.numero);
-                if (aller.correspondanceNumero) refs.push(aller.correspondanceNumero);
-                if (aller.segments) {
-                  aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
+                if (aller.segments && aller.segments.length > 0) {
+                    aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                 }
-                const refAller = refs.length > 0 ? refs.join(' + ') : '';
+                if (refs.length === 0 && aller.numero) {
+                    refs.push(aller.numero.split(' + ')[0]);
+                }
+                const refAller = refs.join(' + ');
 
                 if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                 if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
@@ -1067,12 +1075,13 @@ export default function Dashboard() {
               }
               if (retour) {
                 let refs: string[] = [];
-                if (retour.numero) refs.push(retour.numero);
-                if (retour.correspondanceNumero) refs.push(retour.correspondanceNumero);
-                if (retour.segments) {
-                  retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
+                if (retour.segments && retour.segments.length > 0) {
+                    retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                 }
-                const refRetour = refs.length > 0 ? refs.join(' + ') : '';
+                if (refs.length === 0 && retour.numero) {
+                    refs.push(retour.numero);
+                }
+                const refRetour = refs.join(' + ');
 
                 if (retour.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
                 if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 38})] = { v: retour.correspondanceLieu }; // AM (CORRESP)
