@@ -58,6 +58,8 @@ export interface Participant {
   dejaExporte?: boolean;
   optionsChoisies?: string;
   billetsEnvoyes?: boolean;
+  dateDebut?: string;
+  dateFin?: string;
 }
 
 export interface Congres {

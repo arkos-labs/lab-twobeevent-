@@ -986,13 +986,13 @@ export default function Dashboard() {
                 const hotel = p.logistique.hotels[0];
 
                 if (aller) {
-                  // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) H.Dep, AF(31) Gare Arr, AG(32) H.Arr, AH(33) Corresp, AI(34) Ref
+                  // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) Gare Corresp, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
                   if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                   if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
-                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.depart };      // AE
+                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE
                   if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuArrivee }; // AF
-                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.arrivee };     // AG
-                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.correspondanceLieu }; // AH
+                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      // AG
+                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     // AH
                   if (aller.numero) ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: aller.numero };       // AI
                 }
                 if (retour) {
@@ -1031,13 +1031,13 @@ export default function Dashboard() {
               const hotel = p.logistique.hotels[0];
 
               if (aller) {
-                // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) H.Dep, AF(31) Gare Arr, AG(32) H.Arr, AH(33) Corresp, AI(34) Ref
+                // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) Gare Corresp, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
                 if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                 if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
-                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 30})] = { v: aller.depart };      // AE
+                if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 30})] = { v: aller.correspondanceLieu }; // AE
                 if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuArrivee }; // AF
-                if (aller.arrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.arrivee };     // AG
-                if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 33})] = { v: aller.correspondanceLieu }; // AH
+                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.depart };      // AG
+                if (aller.arrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 33})] = { v: aller.arrivee }; // AH
                 if (aller.numero) ws[XLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: aller.numero };       
               }
               if (retour) {
