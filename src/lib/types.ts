@@ -8,6 +8,7 @@ export interface Segment {
   duree?: string;
   classe?: string;
   placement?: string;
+  type?: 'TRAIN' | 'FLIGHT' | 'COVOIT' | 'AUTRE';
 }
 
 export interface Trajet {
@@ -21,9 +22,10 @@ export interface Trajet {
   segments?: Segment[];
   correspondanceLieu?: string;
   correspondanceHeure?: string;
-  correspondanceArrivee?: string;
+  correspondanceArrivee?: string; 
   correspondanceDate?: string;
   correspondanceNumero?: string;
+  correspondanceType?: 'TRAIN' | 'FLIGHT' | 'COVOIT' | 'AUTRE';
   duree?: string;
   classe?: string;
   placement?: string;

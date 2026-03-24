@@ -33,6 +33,7 @@ const trajetVide = (): Trajet => ({
   correspondanceArrivee: '',
   correspondanceDate: '',
   correspondanceNumero: '',
+  correspondanceType: 'TRAIN',
   duree: '',
   classe: '',
   placement: '',
@@ -611,11 +612,13 @@ export default function Dashboard() {
       'moyen de transport aller': aller?.type === 'FLIGHT' ? 'Avion' : 'Train',
       'gare de départ aller': aller?.lieuDepart || '',
       'correspondance aller': aller?.correspondanceLieu || '',
+      'type correspondance aller': aller?.correspondanceType === 'FLIGHT' ? 'Avion' : (aller?.correspondanceType === 'TRAIN' ? 'Train' : (aller?.correspondanceType || '')),
       "gare d'arrivee aller": aller?.lieuArrivee || '',
       "gare d'arrivée aller": aller?.lieuArrivee || '',
       'heure de depart aller': aller?.depart || '',
       "heure d'arrivee aller": aller?.arrivee || '',
       'reference aller': aller?.numero || '',
+      'reference correspondance aller': aller?.correspondanceNumero || '',
 
       // Acheminement Retour
       RETOUR_DEPART: retour?.lieuDepart || '',
@@ -628,11 +631,13 @@ export default function Dashboard() {
       'moyen de transport retour': retour?.type === 'FLIGHT' ? 'Avion' : 'Train',
       'gare de depart retour': retour?.lieuDepart || '',
       'correspondance retour': retour?.correspondanceLieu || '',
+      'type correspondance retour': retour?.correspondanceType === 'FLIGHT' ? 'Avion' : (retour?.correspondanceType === 'TRAIN' ? 'Train' : (retour?.correspondanceType || '')),
       "gare d'arrivée retour": retour?.lieuArrivee || '',
       "gare d'arrivee retour": retour?.lieuArrivee || '',
       'heure de depart retour': retour?.depart || '',
       "heure d'arrivee retour": retour?.arrivee || '',
       'reference retour': retour?.numero || '',
+      'reference correspondance retour': retour?.correspondanceNumero || '',
 
       // Hotel
       HOTEL_NOM: hotel?.nom || '',
@@ -882,7 +887,7 @@ export default function Dashboard() {
       'Date Aller': p.logistique?.transports[0]?.aller.date,
       'Heure Aller': p.logistique?.transports[0]?.aller.depart,
       'Correspondance Aller': p.logistique?.transports[0]?.aller.correspondanceLieu
-        ? `${p.logistique.transports[0].aller.correspondanceLieu} (le ${p.logistique.transports[0].aller.correspondanceDate} à ${p.logistique.transports[0].aller.correspondanceHeure}) - N° ${p.logistique.transports[0].aller.correspondanceNumero || '?'}`
+        ? `${p.logistique.transports[0].aller.correspondanceLieu} (${p.logistique.transports[0].aller.correspondanceType === 'FLIGHT' ? 'Avion' : (p.logistique.transports[0].aller.correspondanceType === 'TRAIN' ? 'Train' : (p.logistique.transports[0].aller.correspondanceType || ''))}) le ${p.logistique.transports[0].aller.correspondanceDate} à ${p.logistique.transports[0].aller.correspondanceHeure} - N° ${p.logistique.transports[0].aller.correspondanceNumero || '?'}`
         : 'Direct',
       // RETOUR
       'Type Retour': p.logistique?.transports[0]?.retour.type === 'TRAIN' ? 'Train' : (p.logistique?.transports[0]?.retour.type === 'FLIGHT' ? 'Avion' : ''),
@@ -1054,7 +1059,12 @@ export default function Dashboard() {
                   
                   const refAller = refs.join(' + ');
 
-                  if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
+                  if (aller.type) {
+                      const mode = (aller.correspondanceLieu && aller.correspondanceType && aller.correspondanceType !== aller.type)
+                          ? `${aller.type === 'TRAIN' ? 'Train' : 'Avion'} + ${aller.correspondanceType === 'TRAIN' ? 'Train' : 'Avion'}`
+                          : (aller.type === 'TRAIN' ? 'Train' : 'Avion');
+                      ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: mode }; 
+                  }
                   if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
                   if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE (GARE CORRESP)
                   if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuArrivee }; // AF
@@ -1075,7 +1085,12 @@ export default function Dashboard() {
                   const refRetour = refs.join(' + ');
 
                   if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
-                  if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
+                  if (retour.type) {
+                      const mode = (retour.correspondanceLieu && retour.correspondanceType && retour.correspondanceType !== retour.type)
+                          ? `${retour.type === 'TRAIN' ? 'Train' : 'Avion'} + ${retour.correspondanceType === 'TRAIN' ? 'Train' : 'Avion'}`
+                          : (retour.type === 'TRAIN' ? 'Train' : 'Avion');
+                      ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: mode };
+                  }
                   if (retour.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 37})] = { v: retour.lieuDepart };
                   if (retour.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 38})] = { v: retour.correspondanceLieu }; // AM (GARE CORRESP)
                   if (retour.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 39})] = { v: retour.lieuArrivee };
@@ -1168,10 +1183,10 @@ export default function Dashboard() {
         "Billet envoyé": p.billetsEnvoyes ? 'Oui' : 'Non',
         "Traité agence": p.dejaExporte ? 'Oui' : 'Non',
         "Options Choisies": p.optionsChoisies || '',
-        "Transport Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.numero ? `N° ${log.transports[0].aller.numero} (${log.transports[0].aller.depart} -> ${log.transports[0].aller.arrivee})` : ''),
-        "Correspondance Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.correspondanceLieu ? `${log.transports[0].aller.correspondanceLieu} (le ${log.transports[0].aller.correspondanceDate} à ${log.transports[0].aller.correspondanceHeure}) - N° ${log.transports[0].aller.correspondanceNumero || '?'}` : ''),
-        "Transport Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.numero ? `N° ${log.transports[0].retour.numero} (${log.transports[0].retour.depart} -> ${log.transports[0].retour.arrivee})` : ''),
-        "Correspondance Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.correspondanceLieu ? `${log.transports[0].aller.correspondanceLieu} (le ${log.transports[0].aller.correspondanceDate} à ${log.transports[0].aller.correspondanceHeure}) - N° ${log.transports[0].aller.correspondanceNumero || '?'}` : ''),
+        "Transport Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.numero ? `${log.transports[0].aller.type === 'FLIGHT' ? 'Avion' : 'Train'} N° ${log.transports[0].aller.numero} (${log.transports[0].aller.depart} -> ${log.transports[0].aller.arrivee})` : ''),
+        "Correspondance Aller": isSupp ? "" : (log?.transports && log.transports[0]?.aller.correspondanceLieu ? `${log.transports[0].aller.correspondanceLieu} (${log.transports[0].aller.correspondanceType === 'FLIGHT' ? 'Avion' : (log.transports[0].aller.correspondanceType === 'TRAIN' ? 'Train' : (log.transports[0].aller.correspondanceType || ''))}) le ${log.transports[0].aller.correspondanceDate} à ${log.transports[0].aller.correspondanceHeure} - N° ${log.transports[0].aller.correspondanceNumero || '?'}` : ''),
+        "Transport Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.numero ? `${log.transports[0].retour.type === 'FLIGHT' ? 'Avion' : 'Train'} N° ${log.transports[0].retour.numero} (${log.transports[0].retour.depart} -> ${log.transports[0].retour.arrivee})` : ''),
+        "Correspondance Retour": isSupp ? "" : (log?.transports && log.transports[0]?.retour.correspondanceLieu ? `${log.transports[0].retour.correspondanceLieu} (${log.transports[0].retour.correspondanceType === 'FLIGHT' ? 'Avion' : (log.transports[0].retour.correspondanceType === 'TRAIN' ? 'Train' : (log.transports[0].retour.correspondanceType || ''))}) le ${log.transports[0].retour.correspondanceDate} à ${log.transports[0].retour.correspondanceHeure} - N° ${log.transports[0].retour.correspondanceNumero || '?'}` : ''),
         "Hôtel": isSupp ? "" : (log?.hotels && log.hotels.length > 0 ? log.hotels[0].nom : ''),
         "Dates Hôtel": isSupp ? "" : (log?.hotels && log.hotels.length > 0 && log.hotels[0].checkIn ? `Du ${log.hotels[0].checkIn} au ${log.hotels[0].checkOut || '?'}` : '')
       };
@@ -2793,14 +2808,22 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-6 px-4 py-1">
-                                      <input 
-                                        type="text" 
-                                        placeholder="Date" 
-                                        className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-2 py-1 w-32 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 outline-none focus:ring-2 focus:ring-blue-500/20" 
-                                        value={prop.aller.correspondanceDate || ''} 
-                                        onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} 
-                                      />
-                                      <input type="text" placeholder="N° TRAIN 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
+                                      <div className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 dark:border-slate-800 pr-4">
+                                        <select className="bg-transparent border-none p-0 cursor-pointer hover:scale-110 transition-transform text-sm" value={prop.aller.correspondanceType || 'TRAIN'} onChange={e => updateTransport(idx, 'aller', 'correspondanceType', e.target.value as any)}>
+                                          <option value="TRAIN">🚆</option>
+                                          <option value="FLIGHT">✈️</option>
+                                          <option value="COVOIT">🚗</option>
+                                          <option value="AUTRE">➕</option>
+                                        </select>
+                                        <input 
+                                          type="text" 
+                                          placeholder="Date" 
+                                          className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-2 py-1 w-24 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 outline-none focus:ring-2 focus:ring-blue-500/20" 
+                                          value={prop.aller.correspondanceDate || ''} 
+                                          onChange={e => updateTransport(idx, 'aller', 'correspondanceDate', e.target.value)} 
+                                        />
+                                      </div>
+                                      <input type="text" placeholder="N° TRAIN / VOL 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.aller.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceNumero', e.target.value)} />
                                       <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-950/20 px-2 py-1 rounded-lg">
                                         <Clock className="w-2.5 h-2.5 text-orange-400" />
                                         <input type="text" placeholder="ESCALE" className="bg-transparent border-none p-0 text-[9px] font-black uppercase text-orange-400 placeholder:text-orange-200 w-16 focus:ring-0" value={prop.aller.correspondanceDuree || ''} onChange={e => updateTransport(idx, 'aller', 'correspondanceDuree', e.target.value)} />
@@ -2901,14 +2924,22 @@ export default function Dashboard() {
                                     </div>
                                     {/* Row 2 : Détails Techniques (Date, Numéro...) */}
                                     <div className="flex items-center gap-6 px-4 py-1">
-                                      <input 
-                                        type="text" 
-                                        placeholder="Date" 
-                                        className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2 py-1 w-32 text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 outline-none focus:ring-2 focus:ring-orange-500/20" 
-                                        value={prop.retour.correspondanceDate || ''} 
-                                        onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} 
-                                      />
-                                      <input type="text" placeholder="N° TRAIN 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
+                                      <div className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 dark:border-slate-800 pr-4">
+                                        <select className="bg-transparent border-none p-0 cursor-pointer hover:scale-110 transition-transform text-sm" value={prop.retour.correspondanceType || 'TRAIN'} onChange={e => updateTransport(idx, 'retour', 'correspondanceType', e.target.value as any)}>
+                                          <option value="TRAIN">🚆</option>
+                                          <option value="FLIGHT">✈️</option>
+                                          <option value="COVOIT">🚗</option>
+                                          <option value="AUTRE">➕</option>
+                                        </select>
+                                        <input 
+                                          type="text" 
+                                          placeholder="Date" 
+                                          className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg px-2 py-1 w-24 text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 outline-none focus:ring-2 focus:ring-orange-500/20" 
+                                          value={prop.retour.correspondanceDate || ''} 
+                                          onChange={e => updateTransport(idx, 'retour', 'correspondanceDate', e.target.value)} 
+                                        />
+                                      </div>
+                                      <input type="text" placeholder="N° TRAIN / VOL 2" className="flex-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-gray-400 placeholder:text-gray-200" value={prop.retour.correspondanceNumero || ''} onChange={e => updateTransport(idx, 'retour', 'correspondanceNumero', e.target.value)} />
                                       {prop.retour.correspondanceDuree && (
                                         <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-950/20 px-2 py-1 rounded-lg">
                                           <Clock className="w-2.5 h-2.5 text-orange-400" />
