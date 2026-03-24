@@ -34,10 +34,9 @@ function extractAllDetails() {
   // --- LOGIQUE SNCF CONNECT ---
   if (url.includes("sncf-connect.com")) {
     console.log("[Twobeevent] Analyse SNCF Connect...");
-    
+
     // On cherche les horaires du type "08h12" ou "08:12"
     const times = Array.from(fullText.matchAll(/(\d{1,2}[h:]\d{2})/g)).map(m => m[1].replace('h', ':'));
-    const trainNums = Array.from(fullText.matchAll(/\b(TGV|OUIGO|TER|INTERCITES)\s*(\d{4,6})\b/gi)).map(m => `${m[1]} ${m[2]}`);
     
     // On essaye de trouver les gares (souvent en début de ligne après l'horaire dans le détail)
     const stations = [];
@@ -48,10 +47,13 @@ function extractAllDetails() {
       }
     });
 
+    // RECHERCHE AGGRESSIVE DES NUMÉROS DE TRAIN (PLUSIEURS SEGMENTS)
+    const trainKeywords = "TGV|OUIGO|TER|INTERCITES|INOUI|ICE|LYRIA|THALYS|EUROSTAR";
+    const trainReg = new RegExp(`\\b(${trainKeywords})\\s*(\\d{2,6})\\b`, "gi");
+    const allTrainFindings = Array.from(fullText.matchAll(trainReg)).map(m => `${m[1].toUpperCase()} ${m[2]}`);
+    const uniqueTrainNums = [...new Set(allTrainFindings)];
+    
     if (times.length >= 2) {
-      // Nettoyage et unicité des numéros de train
-      const uniqueTrainNums = [...new Set(trainNums)];
-      
       data.transport = {
         aller: {
           type: "TRAIN",
@@ -59,7 +61,7 @@ function extractAllDetails() {
           lieuArrivee: stations[stations.length - 1] || "Inconnu",
           depart: times[0],
           arrivee: times[times.length - 1],
-          numero: uniqueTrainNums.join(' / ') || "",
+          numero: uniqueTrainNums.join(' / ') || (allTrainFindings[0] || ""),
           date: "", 
           correspondanceLieu: ""
         },
