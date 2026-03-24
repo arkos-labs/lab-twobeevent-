@@ -387,7 +387,7 @@ export default function Dashboard() {
         const etablissement = String(row['Q'] || '').trim();
 
         return {
-          id: generateId(), // Utilisation du helper sécurisé
+          id: generateId(),
           nom: `${prenom} ${nom}`.trim() || 'Inconnu',
           email,
           telephone,
@@ -405,11 +405,14 @@ export default function Dashboard() {
         r.readAsDataURL(file);
       });
 
-      // Mise à jour intelligente (Upsert) pour ne pas perdre les données déjà capturées
+      // Mise à jour intelligente (Sync) : On synchronise avec le fichier source
       setCongres(prev => prev.map(c => {
         if (c.id !== selectedId) return c;
 
-        const mergedParticipants = [...c.participants];
+        // 1. On prépare la liste des participants qui existent déjà
+        let mergedParticipants = [...c.participants];
+        
+        // 2. On met à jour ou on ajoute ceux du fichier Excel
         imported.forEach(imp => {
           const idx = mergedParticipants.findIndex(p => 
             (imp.email && p.email.toLowerCase() === imp.email.toLowerCase()) ||
@@ -417,12 +420,12 @@ export default function Dashboard() {
           );
 
           if (idx !== -1) {
-            // Mise à jour de l'existant sans écraser l'ID ni la logistique déjà capturée
+            // Mise à jour de l'existant
             mergedParticipants[idx] = {
               ...mergedParticipants[idx],
               telephone: imp.telephone || mergedParticipants[idx].telephone,
               villeDepart: imp.villeDepart || mergedParticipants[idx].villeDepart,
-              // On ne touche pas au statut s'il a déjà été traité
+              // On garde le statut existant s'il n'est plus à traiter
               statut: mergedParticipants[idx].statut === 'A_TRAITER' ? imp.statut : mergedParticipants[idx].statut
             };
           } else {
@@ -431,7 +434,18 @@ export default function Dashboard() {
           }
         });
 
-        return { ...c, participants: mergedParticipants, logisticsTemplate: base64 };
+        // 3. SUPPRESSION : Si un participant n'est plus dans le fichier Excel 
+        // ET qu'il était encore au statut "A_TRAITER", on le retire.
+        const finalParticipants = mergedParticipants.filter(p => {
+          const existsInImport = imported.some(imp => 
+            (imp.email && p.email.toLowerCase() === imp.email.toLowerCase()) ||
+            (p.nom.toLowerCase() === imp.nom.toLowerCase())
+          );
+          // On garde si : présent dans le fichier OU si déjà validé/en attente (sécurité donnée)
+          return existsInImport || p.statut !== 'A_TRAITER';
+        });
+
+        return { ...c, participants: finalParticipants, logisticsTemplate: base64 };
       }));
 
       console.log(`✅ Import terminé : ${imported.length} lignes traitées.`);
@@ -970,12 +984,13 @@ export default function Dashboard() {
                 const hotel = p.logistique.hotels[0];
 
                 if (aller) {
-                  // ALLER : AC(28) Type, AE(30) Corresp, AF(31) Gare Dep, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
+                  // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) H.Dep, AF(31) Gare Arr, AG(32) H.Arr, AH(33) Corresp, AI(34) Ref
                   if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
-                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.correspondanceLieu }; // AE(30)
-                  if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuDepart }; // AF
-                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.depart };      // AG
-                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.arrivee };     // AH
+                  if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
+                  if (aller.depart) ws[XLSX.utils.encode_cell({r: idx, c: 30})] = { v: aller.depart };      // AE
+                  if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: idx, c: 31})] = { v: aller.lieuArrivee }; // AF
+                  if (aller.arrivee) ws[XLSX.utils.encode_cell({r: idx, c: 32})] = { v: aller.arrivee };     // AG
+                  if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: idx, c: 33})] = { v: aller.correspondanceLieu }; // AH
                   if (aller.numero) ws[XLSX.utils.encode_cell({r: idx, c: 34})] = { v: aller.numero };       // AI
                 }
                 if (retour) {
@@ -1014,9 +1029,13 @@ export default function Dashboard() {
               const hotel = p.logistique.hotels[0];
 
               if (aller) {
+                // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) H.Dep, AF(31) Gare Arr, AG(32) H.Arr, AH(33) Corresp, AI(34) Ref
                 if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
-                if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuDepart }; 
-                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.depart };      
+                if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
+                if (aller.depart) ws[XLSX.utils.encode_cell({r: nextRow, c: 30})] = { v: aller.depart };      // AE
+                if (aller.lieuArrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 31})] = { v: aller.lieuArrivee }; // AF
+                if (aller.arrivee) ws[XLSX.utils.encode_cell({r: nextRow, c: 32})] = { v: aller.arrivee };     // AG
+                if (aller.correspondanceLieu) ws[XLSX.utils.encode_cell({r: nextRow, c: 33})] = { v: aller.correspondanceLieu }; // AH
                 if (aller.numero) ws[XLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: aller.numero };       
               }
               if (retour) {
