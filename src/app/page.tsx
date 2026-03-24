@@ -1967,98 +1967,100 @@ export default function Dashboard() {
                             </td>
 
                             {/* Aller (En ligne) */}
-                             <td className="px-6 py-6 transition-all min-w-[320px]">
+                             <td className="px-6 py-6 transition-all min-w-[380px]">
                                {transport?.aller ? (
-                                 <div className="flex flex-col gap-1.5 bg-blue-50/50 dark:bg-blue-900/10 p-2.5 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
-                                   <div className="flex items-center gap-2">
-                                     <div className="bg-blue-600 text-white p-1 rounded-md shadow-sm">
-                                       {transport.aller.type === 'FLIGHT' ? <Plane className="w-3 h-3" /> : <Train className="w-3 h-3" />}
-                                     </div>
-                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.aller.lieuDepart}</span>
-                                     <ArrowRight className="w-3 h-3 text-blue-400 shrink-0" />
-                                     
-                                     {transport.aller.correspondanceLieu && (
-                                       <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 rounded-lg border-2 border-amber-200 dark:border-amber-800/50 shadow-sm shrink-0 group/escale relative">
-                                         <MapPin className="w-3 h-3 text-amber-600 animate-bounce" />
-                                         <span className="font-black text-amber-800 dark:text-amber-200 text-[9px] tracking-widest uppercase">ESCALE : {transport.aller.correspondanceLieu}</span>
-                                         <ArrowRight className="w-2 h-2 text-amber-400 shrink-0" />
+                                 <div className="flex flex-col gap-2.5 bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm transition-all group-hover:scale-[1.02]">
+                                   {/* Header: Train Number & Type */}
+                                   <div className="flex items-center justify-between border-b border-blue-100/50 dark:border-blue-900/20 pb-2">
+                                     <div className="flex items-center gap-2">
+                                       <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-sm">
+                                         {transport.aller.type === 'FLIGHT' ? <Plane className="w-3.5 h-3.5" /> : <Train className="w-3.5 h-3.5" />}
                                        </div>
-                                     )}
-                                     
-                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.aller.lieuArrivee}</span>
+                                       <span className="font-black text-[10px] text-blue-700 dark:text-blue-300 uppercase tracking-widest">{transport.aller.numero || 'SANS N°'}</span>
+                                     </div>
+                                     <span className="font-black text-blue-800 dark:text-blue-200 text-[10px] bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md border border-blue-100 dark:border-blue-800/50">{transport.aller.date || '--'}</span>
                                    </div>
 
-                                   <div className="flex items-center justify-between text-[10px]">
-                                     <div className="flex items-center gap-2">
-                                       <Calendar className="w-3 h-3 text-blue-500" />
-                                       <span className="font-black text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">{transport.aller.date || '??'}</span>
-                                       {transport.aller.correspondanceLieu && (
-                                         <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-100/50 dark:bg-amber-950/20 px-2 py-0.5 rounded-md border border-amber-200/50 ml-2 italic">
-                                           Via {transport.aller.correspondanceLieu}
-                                         </span>
-                                       )}
+                                   {/* Main Journey Flow */}
+                                   <div className="flex items-center gap-3">
+                                     <div className="flex flex-col flex-1 min-w-0">
+                                       <span className="font-black text-gray-900 dark:text-gray-50 text-xs leading-tight break-words">{transport.aller.lieuDepart}</span>
+                                       <span className="text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">{transport.aller.depart}</span>
                                      </div>
-                                     <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-sm font-black text-blue-600 dark:text-blue-400 gap-1.5 ml-auto">
-                                       <span>{transport.aller.depart}</span>
-                                       {transport.aller.arrivee && (
-                                         <>
-                                           <span className="text-[8px] text-blue-300">-</span>
-                                           <span>{transport.aller.arrivee}</span>
-                                         </>
-                                       )}
+
+                                     <ArrowRight className="w-4 h-4 text-blue-300 shrink-0" />
+
+                                     <div className="flex flex-col flex-1 min-w-0 text-right">
+                                       <span className="font-black text-gray-900 dark:text-gray-50 text-xs leading-tight break-words">{transport.aller.lieuArrivee}</span>
+                                       <span className="text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">{transport.aller.arrivee}</span>
                                      </div>
                                    </div>
+
+                                   {/* Correspondence Flow */}
+                                   {transport.aller.correspondanceLieu && (
+                                     <div className="mt-1 flex items-center gap-2 bg-amber-50/50 dark:bg-amber-900/20 p-2 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                                       <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                                       <p className="text-[10px] font-black text-amber-800 dark:text-amber-200 uppercase tracking-tighter">
+                                         Escale : {transport.aller.correspondanceLieu} 
+                                         <span className="mx-2 text-amber-300">|</span>
+                                         {transport.aller.correspondanceHeure}
+                                       </p>
+                                     </div>
+                                   )}
                                  </div>
                                ) : (
-                                 <span className="text-[10px] font-black text-gray-300 uppercase italic">Aller non saisi</span>
+                                 <div className="py-4 text-center border-2 border-dashed border-gray-100 dark:border-gray-800/50 rounded-2xl">
+                                   <span className="text-[10px] font-black text-gray-300 uppercase italic">Aller non saisi</span>
+                                 </div>
                                )}
                              </td>
 
                              {/* Retour (En ligne) */}
-                             <td className="px-6 py-6 transition-all min-w-[320px]">
+                             <td className="px-6 py-6 transition-all min-w-[380px]">
                                {transport?.retour ? (
-                                 <div className="flex flex-col gap-1.5 bg-orange-50/50 dark:bg-orange-900/10 p-2.5 rounded-xl border border-orange-100 dark:border-orange-900/30 shadow-sm">
-                                   <div className="flex items-center gap-2">
-                                     <div className="bg-orange-600 text-white p-1 rounded-md shadow-sm">
-                                       {transport.retour.type === 'FLIGHT' ? <Plane className="w-3 h-3" /> : <Train className="w-3 h-3" />}
-                                     </div>
-                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.retour.lieuDepart}</span>
-                                     <ArrowRight className="w-3 h-3 text-orange-400 shrink-0" />
-                                     
-                                     {transport.retour.correspondanceLieu && (
-                                       <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 rounded-lg border-2 border-amber-200 dark:border-amber-800/50 shadow-sm shrink-0 group/escale relative">
-                                         <MapPin className="w-3 h-3 text-amber-600 animate-bounce" />
-                                         <span className="font-black text-amber-800 dark:text-amber-200 text-[9px] tracking-widest uppercase">ESCALE : {transport.retour.correspondanceLieu}</span>
-                                         <ArrowRight className="w-2 h-2 text-amber-400 shrink-0" />
+                                 <div className="flex flex-col gap-2.5 bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30 shadow-sm transition-all group-hover:scale-[1.02]">
+                                   {/* Header: Train Number & Type */}
+                                   <div className="flex items-center justify-between border-b border-orange-100/50 dark:border-orange-900/20 pb-2">
+                                     <div className="flex items-center gap-2">
+                                       <div className="bg-orange-600 text-white p-1.5 rounded-lg shadow-sm">
+                                         {transport.retour.type === 'FLIGHT' ? <Plane className="w-3.5 h-3.5" /> : <Train className="w-3.5 h-3.5" />}
                                        </div>
-                                     )}
-                                     
-                                     <span className="font-black text-gray-900 dark:text-gray-50 text-xs truncate max-w-[90px]">{transport.retour.lieuArrivee}</span>
+                                       <span className="font-black text-[10px] text-orange-700 dark:text-orange-300 uppercase tracking-widest">{transport.retour.numero || 'SANS N°'}</span>
+                                     </div>
+                                     <span className="font-black text-orange-800 dark:text-orange-200 text-[10px] bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/50">{transport.retour.date || '--'}</span>
                                    </div>
 
-                                   <div className="flex items-center justify-between text-[10px]">
-                                     <div className="flex items-center gap-2">
-                                       <Calendar className="w-3 h-3 text-orange-500" />
-                                       <span className="font-black text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 px-1.5 py-0.5 rounded">{transport.retour.date || '??'}</span>
-                                       {transport.retour.correspondanceLieu && (
-                                         <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-100/50 dark:bg-amber-950/20 px-2 py-0.5 rounded-md border border-amber-200/50 ml-2 italic">
-                                           Via {transport.retour.correspondanceLieu}
-                                         </span>
-                                       )}
+                                   {/* Main Journey Flow */}
+                                   <div className="flex items-center gap-3">
+                                     <div className="flex flex-col flex-1 min-w-0">
+                                       <span className="font-black text-gray-900 dark:text-gray-50 text-xs leading-tight break-words">{transport.retour.lieuDepart}</span>
+                                       <span className="text-xl font-black text-orange-600 dark:text-orange-400 mt-0.5">{transport.retour.depart}</span>
                                      </div>
-                                     <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-sm font-black text-orange-600 dark:text-orange-400 gap-1.5 ml-auto">
-                                       <span>{transport.retour.depart}</span>
-                                       {transport.retour.arrivee && (
-                                         <>
-                                           <span className="text-[8px] text-orange-300">-</span>
-                                           <span>{transport.retour.arrivee}</span>
-                                         </>
-                                       )}
+
+                                     <ArrowRight className="w-4 h-4 text-orange-300 shrink-0" />
+
+                                     <div className="flex flex-col flex-1 min-w-0 text-right">
+                                       <span className="font-black text-gray-900 dark:text-gray-50 text-xs leading-tight break-words">{transport.retour.lieuArrivee}</span>
+                                       <span className="text-xl font-black text-orange-600 dark:text-orange-400 mt-0.5">{transport.retour.arrivee}</span>
                                      </div>
                                    </div>
+
+                                   {/* Correspondence Flow */}
+                                   {transport.retour.correspondanceLieu && (
+                                     <div className="mt-1 flex items-center gap-2 bg-amber-50/50 dark:bg-amber-900/20 p-2 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                                       <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                                       <p className="text-[10px] font-black text-amber-800 dark:text-amber-200 uppercase tracking-tighter">
+                                         Escale : {transport.retour.correspondanceLieu} 
+                                         <span className="mx-2 text-amber-300">|</span>
+                                         {transport.retour.correspondanceHeure}
+                                       </p>
+                                     </div>
+                                   )}
                                  </div>
                                ) : (
-                                 <span className="text-[10px] font-black text-gray-300 uppercase italic">Retour non saisi</span>
+                                 <div className="py-4 text-center border-2 border-dashed border-gray-100 dark:border-gray-800/50 rounded-2xl">
+                                   <span className="text-[10px] font-black text-gray-300 uppercase italic">Retour non saisi</span>
+                                 </div>
                                )}
                              </td>
                             {/* Hotel */}
