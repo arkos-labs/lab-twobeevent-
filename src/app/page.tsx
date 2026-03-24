@@ -472,7 +472,13 @@ export default function Dashboard() {
       setTransports(p.logistique.transports);
       setHotels(p.logistique.hotels);
     } else {
-      setTransports([propositionVide()]);
+      const initProp = propositionVide();
+      // Pré-remplissage intelligent basé sur la ville de départ du participant
+      if (p.villeDepart) {
+        initProp.aller.lieuDepart = p.villeDepart;
+        initProp.retour.lieuArrivee = p.villeDepart;
+      }
+      setTransports([initProp]);
       setHotels([{ nom: '' }]);
     }
     setModalOpen(true);
@@ -2607,7 +2613,14 @@ export default function Dashboard() {
                     </button>
                     {transports.length < 3 && (
                       <button
-                        onClick={() => setTransports(t => [...t, propositionVide()])}
+                        onClick={() => {
+                          const newProp = propositionVide();
+                          if (currentParticipant?.villeDepart) {
+                            newProp.aller.lieuDepart = currentParticipant.villeDepart;
+                            newProp.retour.lieuArrivee = currentParticipant.villeDepart;
+                          }
+                          setTransports(t => [...t, newProp]);
+                        }}
                         className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all border border-blue-100"
                       >
                         + Ajouter une Option
