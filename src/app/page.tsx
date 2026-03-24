@@ -105,6 +105,8 @@ const normalizeCongres = (c: any, allParticipants: any[] = []): Congres => ({
   adresse: c.adresse || '',
   heure: c.heure || '',
   archive: c.archive || false,
+  logo: c.logo || undefined,
+  signature: c.signature || undefined,
   emailTemplate: c.email_template ? JSON.parse(c.email_template) : undefined,
   bulletinTemplate: isJNIEvent(c.nom)
     ? ('data:application/pdf;base64,' + JNI_BULLETIN_PDF)
@@ -1258,6 +1260,8 @@ export default function Dashboard() {
           lieu: c.lieu,
           adresse: c.adresse,
           archive: c.archive || false,
+          logo: c.logo || null,
+          signature: c.signature || null,
           email_template: c.emailTemplate || null,
           bulletin_template: c.bulletinTemplate || null,
           logistics_template: c.logisticsTemplate || null
