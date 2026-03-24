@@ -987,13 +987,14 @@ export default function Dashboard() {
 
                 if (aller) {
                   // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) RÉFÉRENCE, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
-                  // Formatage référence combinée (Numéro 1 + Numéro 2)
-                  let refAller = aller.numero;
-                  if (aller.correspondanceNumero) refAller += " + " + aller.correspondanceNumero;
-                  else if (aller.segments && aller.segments.length > 1) {
-                    const refs = aller.segments.map(s => s.numero).filter(n => !!n);
-                    if (refs.length > 1) refAller = refs.join(' + ');
+                  // Extraction robuste de la référence
+                  let refs: string[] = [];
+                  if (aller.numero) refs.push(aller.numero);
+                  if (aller.correspondanceNumero) refs.push(aller.correspondanceNumero);
+                  if (aller.segments && aller.segments.length > 0) {
+                    aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                   }
+                  const refAller = refs.length > 0 ? refs.join(' + ') : '';
 
                   if (aller.type) ws[XLSX.utils.encode_cell({r: idx, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                   if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: idx, c: 29})] = { v: aller.lieuDepart }; // AD
@@ -1005,12 +1006,13 @@ export default function Dashboard() {
                 }
                 if (retour) {
                   // RETOUR : AJ(35) Date, AK(36) Type, AL(37) Gare Dep, AM(38) RÉFÉRENCE, AN(39) Gare Arr, AO(40) H.Dep, AP(41) H.Arr, AQ(42) Ref
-                  let refRetour = retour.numero;
-                  if (retour.correspondanceNumero) refRetour += " + " + retour.correspondanceNumero;
-                  else if (retour.segments && retour.segments.length > 1) {
-                    const refs = retour.segments.map(s => s.numero).filter(n => !!n);
-                    if (refs.length > 1) refRetour = refs.join(' + ');
+                  let refs: string[] = [];
+                  if (retour.numero) refs.push(retour.numero);
+                  if (retour.correspondanceNumero) refs.push(retour.correspondanceNumero);
+                  if (retour.segments && retour.segments.length > 0) {
+                    retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                   }
+                  const refRetour = refs.length > 0 ? refs.join(' + ') : '';
 
                   if (retour.date) ws[XLSX.utils.encode_cell({r: idx, c: 35})] = { v: retour.date };
                   if (retour.type) ws[XLSX.utils.encode_cell({r: idx, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
@@ -1047,12 +1049,13 @@ export default function Dashboard() {
 
               if (aller) {
                 // ALLER : AC(28) Type, AD(29) Gare Dep, AE(30) RÉFÉRENCE, AF(31) Gare Arr, AG(32) H.Dep, AH(33) H.Arr, AI(34) Ref
-                let refAller = aller.numero;
-                if (aller.correspondanceNumero) refAller += " + " + aller.correspondanceNumero;
-                else if (aller.segments && aller.segments.length > 1) {
-                  const refs = aller.segments.map(s => s.numero).filter(n => !!n);
-                  if (refs.length > 1) refAller = refs.join(' + ');
+                let refs: string[] = [];
+                if (aller.numero) refs.push(aller.numero);
+                if (aller.correspondanceNumero) refs.push(aller.correspondanceNumero);
+                if (aller.segments) {
+                  aller.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                 }
+                const refAller = refs.length > 0 ? refs.join(' + ') : '';
 
                 if (aller.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 28})] = { v: aller.type === 'TRAIN' ? 'Train' : 'Avion' }; 
                 if (aller.lieuDepart) ws[XLSX.utils.encode_cell({r: nextRow, c: 29})] = { v: aller.lieuDepart }; // AD
@@ -1063,12 +1066,13 @@ export default function Dashboard() {
                 ws[XLSX.utils.encode_cell({r: nextRow, c: 34})] = { v: refAller };       
               }
               if (retour) {
-                let refRetour = retour.numero;
-                if (retour.correspondanceNumero) refRetour += " + " + retour.correspondanceNumero;
-                else if (retour.segments && retour.segments.length > 1) {
-                  const refs = retour.segments.map(s => s.numero).filter(n => !!n);
-                  if (refs.length > 1) refRetour = refs.join(' + ');
+                let refs: string[] = [];
+                if (retour.numero) refs.push(retour.numero);
+                if (retour.correspondanceNumero) refs.push(retour.correspondanceNumero);
+                if (retour.segments) {
+                  retour.segments.forEach(s => { if (s.numero && !refs.includes(s.numero)) refs.push(s.numero); });
                 }
+                const refRetour = refs.length > 0 ? refs.join(' + ') : '';
 
                 if (retour.type) ws[XLSX.utils.encode_cell({r: nextRow, c: 36})] = { v: retour.type === 'TRAIN' ? 'Train' : 'Avion' };
                 ws[XLSX.utils.encode_cell({r: nextRow, c: 38})] = { v: refRetour }; // AM
