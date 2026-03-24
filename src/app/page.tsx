@@ -411,17 +411,17 @@ export default function Dashboard() {
         const telephone = String(row[colMap.telephone] || '').trim();
         const codePostal = String(row[colMap.cp] || '').trim();
         
-        // FORÇAGE DES COLONNES SELON DEMANDE UTILISATEUR : U=VILLE, Q=STRUCTURE
-        const ville = String(row['U'] || row[colMap.ville] || '').trim();
-        const etablissement = String(row['Q'] || row[colMap.etablissement] || '').trim();
+        // Utilisation des colonnes détectées (ou fallback sur U et Q si non trouvées)
+        const villeRaw = String(row[colMap.ville] || row['U'] || '').trim();
+        const etablissementRaw = String(row[colMap.etablissement] || row['Q'] || '').trim();
 
         return {
           id: generateId(),
           nom: `${prenom} ${nom}`.trim() || (email ? email.split('@')[0] : 'Inconnu'),
           email,
           telephone,
-          villeDepart: ville || 'À compléter',
-          structure: etablissement || '',
+          villeDepart: villeRaw || 'À préciser',
+          structure: etablissementRaw || '',
           statut: 'A_TRAITER',
         };
       });
@@ -448,8 +448,8 @@ export default function Dashboard() {
             mergedParticipants[idx] = {
               ...mergedParticipants[idx],
               telephone: imp.telephone || mergedParticipants[idx].telephone,
-              villeDepart: imp.villeDepart || mergedParticipants[idx].villeDepart,
-              structure: imp.structure || mergedParticipants[idx].structure,
+              villeDepart: imp.villeDepart, // ÉCRASEMENT PRIORITAIRE
+              structure: imp.structure,    // ÉCRASEMENT PRIORITAIRE
               statut: mergedParticipants[idx].statut === 'A_TRAITER' ? imp.statut : mergedParticipants[idx].statut
             };
           } else {
