@@ -2,7 +2,7 @@
 let lastRequestTime = 0;
 const MIN_DELAY = 1200; // 1.2 seconde entre deux clics pour paraître humain
 
-function secureOpen(url: string, windowName: string) {
+function secureOpen(url: string, windowName: string, forceNewTab = false) {
   const now = Date.now();
   if (now - lastRequestTime < MIN_DELAY) {
     console.warn("[Security] Requête trop rapide, blocage préventif.");
@@ -13,8 +13,11 @@ function secureOpen(url: string, windowName: string) {
   // Délai aléatoire (Jitter) entre 100 et 600ms pour casser la régularité
   const randomJitter = Math.floor(Math.random() * 500) + 100;
   
+  // En mode Batch/Auto, on veut parfois forcer un nouvel onglet
+  const target = forceNewTab ? `_blank` : windowName;
+
   setTimeout(() => {
-    window.open(url, windowName, 'noreferrer');
+    window.open(url, target, 'noreferrer');
   }, randomJitter);
 }
 
@@ -25,7 +28,8 @@ export function openGoogleFlights(
   dateRetour?: string,
   heureDebut?: string,  // format HH:mm
   congresId?: string,
-  participantId?: string
+  participantId?: string,
+  isAuto = false
 ) {
   // Nettoyer les villes (enlever les codes postaux, etc.)
   const cleanCity = (str: string) =>
@@ -47,9 +51,10 @@ export function openGoogleFlights(
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
+  if (isAuto) url += `&twobeevent_mode=auto`;
 
-  // On réutilise l'onglet de recherche de vol pour éviter le spam
-  secureOpen(url, 'twobeevent_flights_search');
+  // On réutilise l'onglet de recherche de vol pour éviter le spam, sauf en auto
+  secureOpen(url, 'twobeevent_flights_search', isAuto);
 }
 
 // Ouvre Google Hotels pré-rempli avec les filtres demandés (3-4*, max 150€, petit-déjeuner inclus)
@@ -58,7 +63,8 @@ export function openGoogleHotels(
   checkIn?: string,
   checkOut?: string,
   congresId?: string,
-  participantId?: string
+  participantId?: string,
+  isAuto = false
 ) {
   const cleanCity = (str: string) =>
     str.replace(/\(.*?\)/g, '').trim();
@@ -83,12 +89,13 @@ export function openGoogleHotels(
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
+  if (isAuto) url += `&twobeevent_mode=auto`;
 
-  secureOpen(url, 'twobeevent_hotels_search');
+  secureOpen(url, 'twobeevent_hotels_search', isAuto);
 }
 
 // Ouvre SNCF Connect pré-rempli (trains)
-export function openSNCF(origin: string, destination: string, date: string, dateRetour?: string, heureDebut?: string, congresId?: string, participantId?: string) {
+export function openSNCF(origin: string, destination: string, date: string, dateRetour?: string, heureDebut?: string, congresId?: string, participantId?: string, isAuto = false) {
   const cleanCity = (str: string) =>
     str.replace(/\(.*?\)/g, '').trim().split(' ')[0];
   const from = cleanCity(origin);
@@ -112,9 +119,10 @@ export function openSNCF(origin: string, destination: string, date: string, date
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
+  if (isAuto) url += `&twobeevent_mode=auto`;
 
-  // La SNCF est très sensible : on réutilise STRICTEMENT le même onglet
-  secureOpen(url, 'twobeevent_sncf_search');
+  // La SNCF est très sensible : on réutilise STRICTEMENT le même onglet, sauf en auto
+  secureOpen(url, 'twobeevent_sncf_search', isAuto);
 }
 
 // Ouvre Trainline pré-rempli (alternative à SNCF Connect)
@@ -125,7 +133,8 @@ export function openTrainline(
   dateRetour?: string, 
   heureDebut?: string, 
   congresId?: string, 
-  participantId?: string
+  participantId?: string,
+  isAuto = false
 ) {
   const cleanCity = (str: string) =>
     str.replace(/\(.*?\)/g, '').trim().split(' ')[0];
@@ -150,6 +159,7 @@ export function openTrainline(
   if (congresId) url += `&twobeevent_congres_id=${encodeURIComponent(congresId)}`;
   if (participantId) url += `&twobeevent_participant_id=${encodeURIComponent(participantId)}`;
   url += `&twobeevent_api_url=${encodeURIComponent(window.location.origin)}`;
+  if (isAuto) url += `&twobeevent_mode=auto`;
 
-  secureOpen(url, 'twobeevent_trainline_search');
+  secureOpen(url, 'twobeevent_trainline_search', isAuto);
 }

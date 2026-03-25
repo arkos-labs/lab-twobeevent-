@@ -249,6 +249,16 @@ export default function Dashboard() {
   }, [modalOpen, currentParticipant]);
 
   const selectedCongres = congres.find(c => c.id === selectedId) ?? null;
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const batchTimeoutsRef = useRef<any[]>([]);
+
+  const handleStopBatch = () => {
+    batchTimeoutsRef.current.forEach(t => clearTimeout(t));
+    batchTimeoutsRef.current = [];
+    setIsBatchRunning(false);
+    alert("⏹️ Recherche automatique arrêtée.");
+  };
+
   const participants = selectedCongres?.participants || [];
 
   const updateParticipants = (congresId: string, updater: (ps: Participant[]) => Participant[]) => {
@@ -982,6 +992,98 @@ export default function Dashboard() {
       },
       ...prev
     ]);
+  };
+
+  const handleBatchParticipant = async (p: Participant) => {
+    if (!selectedCongres) return;
+    
+    // On garde trace du nombre de transports initiaux pour savoir si l'extension a capturé quelque chose
+    const initialTransportsCount = p.logistique?.transports?.length || 0;
+
+    // 1. PHASE TRAIN (Priorité) : On lance l'aller et le retour SNCF
+    openSNCF(
+      p.villeDepart, 
+      selectedCongres.lieu || selectedCongres.nom, 
+      selectedCongres.dateDebut || selectedCongres.date, 
+      undefined, 
+      undefined, 
+      selectedCongres.id, 
+      p.id,
+      true // MODE AUTO
+    );
+
+    // On attend 2s avant d'ouvrir le retour (si besoin d'un onglet séparé ou navigation même onglet)
+    const t1 = setTimeout(() => {
+        openSNCF(
+          selectedCongres.lieu || selectedCongres.nom,
+          p.villeDepart,
+          selectedCongres.dateFin || selectedCongres.date,
+          undefined,
+          undefined,
+          selectedCongres.id,
+          p.id,
+          true // MODE AUTO
+        );
+    }, 2500);
+    batchTimeoutsRef.current.push(t1);
+
+    // 2. PHASE ATTENTE & DÉCISION (12s après)
+    const t2 = setTimeout(() => {
+        // On récupère le participant à jour depuis l'état local pour vérifier s'il a reçu un transport
+        const updatedCongres = congres.find(c => c.id === selectedCongres.id);
+        const updatedP = updatedCongres?.participants.find(part => part.id === p.id);
+        const currentTransportsCount = updatedP?.logistique?.transports?.length || 0;
+
+        // Si aucun nouveau transport n'a été ajouté par l'extension SNCF (ou si Trainline bloqué)
+        if (currentTransportsCount <= initialTransportsCount) {
+            console.log(`[Batch] Aucun train trouvé pour ${p.nom}. Tentative Avion via Google Flights...`);
+            
+            // Recherche Avion (Aller + Retour en un coup sur Google)
+            openGoogleFlights(
+                p.villeDepart,
+                selectedCongres.lieu || selectedCongres.nom,
+                selectedCongres.dateDebut || selectedCongres.date,
+                selectedCongres.dateFin || selectedCongres.date,
+                undefined,
+                selectedCongres.id,
+                p.id,
+                true // MODE AUTO
+            );
+        } else {
+            console.log(`[Batch] Train trouvé avec succès pour ${p.nom}. Option Avion ignorée.`);
+        }
+    }, 12000); // 12 secondes d'observation pour le train
+    batchTimeoutsRef.current.push(t2);
+  };
+
+  const handleBatchAll = () => {
+    if (!selectedCongres) return;
+    const targets = selectedCongres.participants.filter(p => p.statut === 'A_TRAITER');
+    if (targets.length === 0) {
+      alert("Aucun participant 'À TRAITER' trouvé.");
+      return;
+    }
+    
+    if (!confirm(`Lancer la recherche automatique pour ${targets.length} participants ? (Avion si pas de train)`)) return;
+
+    setIsBatchRunning(true);
+    batchTimeoutsRef.current = [];
+
+    targets.forEach((p, index) => {
+      const t = setTimeout(() => {
+         handleBatchParticipant(p);
+         // Si c'est le dernier
+         if (index === targets.length - 1) {
+            setTimeout(() => {
+              setIsBatchRunning(false);
+              alert("✅ Recherche automatique terminée.");
+            }, 30000); // Temps pour finir le dernier participant
+         }
+      }, index * 25000); 
+      batchTimeoutsRef.current.push(t);
+    });
+    
+    alert("🚀 Recherche groupée lancée ! (Laissez le navigateur ouvert).");
   };
 
   const exportCongresToExcel = (congresId: string) => {
@@ -1753,14 +1855,32 @@ export default function Dashboard() {
               <Bell className="w-5 h-5" />
             </button>
             {selectedCongres && (
-              <button
-                onClick={handleExportAgence}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2"
-              >
-                <span className="hidden md:inline">Envoyer à l'agence</span>
-                <span className="md:hidden">Agence</span>
-                ({participants.filter(p => !p.dejaExporte && p.statut === 'VALIDE').length})
-              </button>
+              <div className="flex gap-2">
+                {isBatchRunning ? (
+                  <button
+                    onClick={handleStopBatch}
+                    className="flex px-4 py-2.5 rounded-xl bg-orange-100 text-orange-600 hover:bg-orange-200 transition-all border border-orange-200 items-center gap-2 text-xs font-black uppercase italic"
+                  >
+                    <Loader2 className="w-4 h-4 animate-spin" /> Arréter
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleBatchAll}
+                    className="hidden lg:flex px-4 py-2.5 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 items-center gap-2 text-xs font-black uppercase italic"
+                    title="Rechercher automatiquement les trajets pour tous les participants A_TRAITER"
+                  >
+                    <Zap className="w-4 h-4 fill-white" /> Recherche Auto
+                  </button>
+                )}
+                <button
+                  onClick={handleExportAgence}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2"
+                >
+                  <span className="hidden md:inline">Envoyer à l'agence</span>
+                  <span className="md:hidden">Agence</span>
+                  ({participants.filter(p => !p.dejaExporte && p.statut === 'VALIDE').length})
+                </button>
+              </div>
             )}
           </div>
         </header>
@@ -2552,6 +2672,12 @@ export default function Dashboard() {
                   </h4>
 
                   <div className="flex gap-3">
+                    <button
+                      onClick={() => currentParticipant && handleBatchParticipant(currentParticipant)}
+                      className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-black hover:bg-rose-100 transition-all border border-rose-100 flex items-center gap-2"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-rose-600" /> Recherche Auto Complète
+                    </button>
                     <button
                       onClick={() => {
                         const text = prompt("Collez ici le texte complet du récapitulatif de voyage (SNCF Connect) :");

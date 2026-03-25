@@ -182,3 +182,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   }
 });
+
+// --- LOGIQUE AUTO-SEND (Mode Batch) ---
+// Si le paramètre twobeevent_mode=auto est présent, l'extension tente d'extraire
+// et d'envoyer les données automatiquement après un délai.
+(function checkAutoMode() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('twobeevent_mode') === 'auto') {
+    console.log("[Twobeevent] Mode AUTOMATIQUE détecté. Extraction dans 3s...");
+    
+    setTimeout(async () => {
+      const data = extractAllDetails();
+      
+      // On ne lance l'envoi que si on a trouvé quelque chose de pertinent (Aller ou Retour ou Hotel)
+      if (data.participantId && (data.transport?.aller || data.transport?.retour || data.hotel)) {
+        console.log("[Twobeevent] Envoi automatique pour le participant:", data.participantId);
+        
+        try {
+          // On utilise le même endpoint que le popup
+          const apiUrl = urlParams.get('twobeevent_api_url') || 'http://localhost:3000';
+          const response = await fetch(`${apiUrl}/api/logistique/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              participantId: data.participantId,
+              hotel: data.hotel,
+              transport: data.transport
+            })
+          });
+
+          if (response.ok) {
+            console.log("[Twobeevent] Succès ! Fermeture de l'onglet dans 1s.");
+            setTimeout(() => window.close(), 1000);
+          } else {
+            console.error("[Twobeevent] Erreur lors de l'envoi auto.");
+          }
+        } catch (err) {
+          console.error("[Twobeevent] Erreur connexion API:", err);
+        }
+      } else {
+        console.warn("[Twobeevent] Aucune donnée valide trouvée pour l'envoi auto.");
+        // Facultatif : fermer quand même si on est sûr que ça ne marchera pas
+        // setTimeout(() => window.close(), 5000);
+      }
+    }, 3500); // Délai de 3.5s pour laisser le JS de la page cible (SNCF, Google) s'exécuter
+  }
+})();
