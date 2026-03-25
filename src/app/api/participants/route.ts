@@ -19,12 +19,21 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const { data: participants, error } = await supabase
+    // Récupérer tous les participants
+    const { data: raw, error } = await supabase
       .from('participants')
       .select('*')
       .order('nom', { ascending: true });
 
     if (error) throw error;
+
+    // Supprimer les doublons par Nom + Prénom (logique JS plus sûre sur Supabase sans RPC)
+    const uniqueMap = new Map();
+    raw?.forEach(p => {
+        const key = `${p.nom}-${p.prenom}`.toLowerCase();
+        if (!uniqueMap.has(key)) uniqueMap.set(key, p);
+    });
+    const participants = Array.from(uniqueMap.values());
 
     return NextResponse.json(
       { participants },
